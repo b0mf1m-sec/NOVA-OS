@@ -9,7 +9,8 @@ while :; do
     ultimo=$(awk '$1=="fim"{print $2}' "$E" 2>/dev/null); agora=$(date +%s)
     if [ -z "$ultimo" ] || [ $((agora - ultimo)) -ge $((d * 86400)) ]; then
       ac=$(cat /sys/class/power_supply/A*/online 2>/dev/null | head -1)
-      [ "${ac:-1}" = 1 ] && "$HOME/.local/bin/nova-varredura"
+      mem=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo); carga=$(cut -d. -f1 /proc/loadavg)
+      [ "${ac:-1}" = 1 ] && [ "${mem:-0}" -ge 1500 ] && [ "${carga:-9}" -lt 1 ] && "$HOME/.local/bin/nova-varredura" rapida   # só com memória sobrando e PC parado
     fi
   fi
   sleep 1800

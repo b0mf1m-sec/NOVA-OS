@@ -1,19 +1,20 @@
 #!/bin/sh
-# Varredura completa do PC com o ClamAV. Uso: nova-varredura [parar]
+# Varredura do PC com o ClamAV. Uso: nova-varredura [rapida|parar]   (sem argumento = completa; rapida = só onde há risco: pasta pessoal, /tmp, pendrives, /opt, /usr/local)
 # Estado em ~/.local/share/nova/varredura.estado (lido pelos Ajustes). Infectados vão para a quarentena.
 D="$HOME/.local/share/nova"; Q="$D/quarentena"; E="$D/varredura.estado"; L="$D/antivirus.log"; mkdir -p "$Q"
 if [ "$1" = parar ]; then pkill -x clamscan; exit 0; fi
+TIPO=COMPLETA; ALVOS=/; [ "$1" = rapida ] && { TIPO=RAPIDA; ALVOS=""; for d in "$HOME" /tmp /var/tmp /opt /usr/local "/media/$USER" "/run/media/$USER"; do [ -d "$d" ] && ALVOS="$ALVOS $d"; done; }
 command -v clamscan >/dev/null || { echo "erro" > "$E"; exit 1; }
 pgrep -x clamscan >/dev/null && exit 0                          # já em andamento
-echo "rodando $(date +%s)" > "$E"
+echo "rodando $(date +%s)" > "$E"   # código 2 do clamscan só avisa de arquivos ilegíveis; sem resumo = interrompida
 out=$(nice -n 15 ionice -c3 clamscan -r -i --move="$Q" --cross-fs=no --max-filesize=100M --max-scansize=200M \
   --exclude-dir='^/proc' --exclude-dir='^/sys' --exclude-dir='^/dev' --exclude-dir='^/run' --exclude-dir='^/var/lib/clamav' \
-  --exclude-dir="^$Q" --exclude-dir='^/snap' --exclude-dir='^/mnt' --exclude-dir='^/media' / 2>/dev/null); rc=$?
+  --exclude-dir="^$Q" --exclude-dir="^$HOME/\.cache" --exclude-dir="^$HOME/\.claude" --exclude-dir='^/snap' --exclude-dir='^/mnt' --exclude-dir='^/media' $ALVOS 2>/dev/null); rc=$?
 inf=$(echo "$out" | sed -n 's/^Infected files: //p'); tot=$(echo "$out" | sed -n 's/^Scanned files: //p')
 chmod 000 "$Q"/* 2>/dev/null
-if [ "$rc" -gt 1 ] || [ -z "$tot" ]; then echo "interrompida $(date +%s)" > "$E"; exit 0; fi
+if [ -z "$tot" ]; then echo "interrompida $(date +%s)" > "$E"; exit 0; fi
 echo "fim $(date +%s) ${inf:-0} ${tot:-0}" > "$E"
-echo "$(date '+%F %T') VARREDURA COMPLETA: ${tot:-0} arquivos, ${inf:-0} infectados" >> "$L"
+echo "$(date '+%F %T') VARREDURA ${TIPO}: ${tot:-0} arquivos, ${inf:-0} infectados" >> "$L"
 if [ "${inf:-0}" -gt 0 ]; then
   notify-send -u critical -i /usr/share/icons/Papirus/48x48/status/dialog-warning.svg "Varredura concluída: ameaça encontrada" "$inf arquivo(s) com vírus foram movidos para a quarentena."
 else

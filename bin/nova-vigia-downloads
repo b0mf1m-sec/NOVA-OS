@@ -15,6 +15,7 @@ echo "$W" | tail -n +2 | tr '\n' '\0' | xargs -0 inotifywait -r -m -q -e close_w
     *) continue;; esac
   [ "$(stat -c %s "$p" 2>/dev/null || echo 0)" -gt 314572800 ] && continue      # acima de 300 MB: pula (pesaria demais)
   sleep 1; [ -f "$p" ] || continue
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do [ "$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)" -ge 1300 ] && break; sleep 15; done   # o ClamAV precisa de ~1,2 GB só para ligar
   out=$(nice -n 15 clamscan --no-summary --infected "$p" 2>/dev/null); rc=$?
   if [ "$rc" = 1 ]; then
     v=$(echo "$out" | sed -n 's/.*: \(.*\) FOUND/\1/p' | head -1); mv -f "$p" "$Q/$f.$(date +%s)" 2>/dev/null && chmod 000 "$Q/$f".* 2>/dev/null
