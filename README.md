@@ -41,7 +41,7 @@ Requisitos: **Debian 13 (Trixie)** já instalado (de preferência instalação m
 
 ```bash
 sudo apt install git
-git clone https://github.com/SEU-USUARIO/NOVA-OS.git
+git clone https://github.com/b0mf1m-sec/NOVA-OS.git
 cd NOVA-OS
 ./install.sh
 ```
