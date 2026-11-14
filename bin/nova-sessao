@@ -1,0 +1,39 @@
+#!/bin/sh
+# Serviços da sessão NOVA OS (chamado no início da área de trabalho e pelos Ajustes: "nova-sessao aplicar").
+cfg() { "$HOME/.local/bin/nova-config" -g "$1" "$2"; }
+aplicar() {
+  # touchpad: toque para clicar e rolagem natural
+  for id in $(xinput list --id-only 2>/dev/null); do
+    xinput list-props "$id" 2>/dev/null | grep -q "libinput Tapping Enabled (" || continue
+    xinput set-prop "$id" "libinput Tapping Enabled" "$(cfg toque 1)" 2>/dev/null
+    xinput set-prop "$id" "libinput Natural Scrolling Enabled" "$(cfg natural 0)" 2>/dev/null
+  done
+  # mouse: "DPI" simulado pela velocidade do ponteiro (400 a 3200; 1600 = padrão), perfil sem aceleração
+  dpi=$(cfg dpi 1600); vel=$(LC_ALL=C awk -v d="$dpi" 'BEGIN{v=(d-1600)/1600; if(v<-1)v=-1; if(v>1)v=1; printf "%.3f", v}')
+  for id in $(xinput list --id-only 2>/dev/null); do
+    xinput list-props "$id" 2>/dev/null | grep -q "libinput Accel Speed (" || continue
+    xinput list-props "$id" 2>/dev/null | grep -q "libinput Tapping Enabled (" && continue      # touchpad não entra
+    xinput set-prop "$id" "libinput Accel Profile Enabled" 0 1 0 2>/dev/null
+    xinput set-prop "$id" "libinput Accel Speed" "$vel" 2>/dev/null
+  done
+  m=$(cfg tela_min 10)                                   # minutos até apagar a tela (0 = nunca)
+  if [ "$m" = 0 ]; then xset s off -dpms 2>/dev/null; else xset s $((m*60)) $((m*60)) 2>/dev/null; xset +dpms dpms $((m*60)) $((m*60)) $((m*60+300)) 2>/dev/null; fi
+}
+aplicar
+[ "$1" = aplicar ] && exit 0
+pgrep -x dunst >/dev/null || dunst &
+LEVE=$(cfg desempenho 0)                                   # Modo desempenho: sem extras
+[ "$(cfg bloqueio 1)" = 1 ] && { pgrep -x xss-lock >/dev/null || xss-lock --transfer-sleep-lock -- dm-tool lock & }   # pede a senha ao voltar do descanso/suspensão
+pgrep -f "bin/bash .*nova-centraliza" >/dev/null || ~/.local/bin/nova-centraliza &                   # centraliza avisos e janelas pequenas
+pgrep -x nova-janelas >/dev/null || ~/.local/bin/nova-janelas &                                 # Alt+Tab bonito e pré-visualização no dock
+pgrep -f "bin/bash .*nova-pausa-varredura" >/dev/null || ~/.local/bin/nova-pausa-varredura &   # pausa a varredura durante vídeo em tela cheia
+[ "$LEVE" = 1 ] || pgrep -x diodon >/dev/null || diodon &                          # copiar/colar continua valendo depois de fechar o app; Win+V = histórico
+pkill -x xcape; xcape -t 300 -e 'Super_L=Super_L|space'       # tecla Windows sozinha abre os Apps
+pgrep -x udiskie >/dev/null || udiskie --automount --notify --no-tray &
+pgrep -f nova-bateria-vigia >/dev/null || "$HOME/.local/bin/nova-bateria-vigia" &
+[ "$(cfg antivirus 1)" = 1 ] && { pgrep -f nova-vigia-downloads >/dev/null || "$HOME/.local/bin/nova-vigia-downloads" & }
+pgrep -f nova-varredura-agenda >/dev/null || "$HOME/.local/bin/nova-varredura-agenda" &
+systemctl is-active -q bluetooth && { pgrep -x blueman-applet >/dev/null || blueman-applet & }
+[ "$LEVE" = 1 ] || [ "$(sed -n 's/^papel = //p' "$HOME/.config/nova/config")" != vivo ] || [ ! -x "$HOME/.local/bin/nova-papel" ] || "$HOME/.local/bin/nova-papel" &
+"$HOME/.local/bin/nova-desempenho" reaplicar
+wait

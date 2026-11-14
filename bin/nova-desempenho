@@ -1,0 +1,34 @@
+#!/bin/sh
+# NOVA OS - Modo desempenho: desliga animações, efeitos e tarefas de fundo não essenciais. O sistema base não muda.
+#   nova-desempenho on | off | estado | reaplicar
+B="$HOME/.local/bin"; CFG="$B/nova-config"
+on() { [ "$($CFG -g desempenho 0)" = 1 ]; }
+compositor() {                                   # reinicia o compositor no perfil certo (nova-picom escolhe)
+  for p in $(pgrep -f 'nova-pico[m]'); do kill "$p" 2>/dev/null; done
+  pkill -x picom 2>/dev/null; sleep 0.4
+  setsid "$B/nova-picom" >/dev/null 2>&1 &
+}
+aplicar() {
+  S="$HOME/.config/gtk-3.0/settings.ini"
+  if on; then
+    [ -f "$S" ] && sed -i 's/^gtk-enable-animations=.*/gtk-enable-animations=0/' "$S"
+    dconf write /net/launchpad/plank/docks/dock1/zoom-enabled false
+    pkill -x nova-papel 2>/dev/null && feh --no-fehbg --bg-fill "$HOME/.local/share/nova/wallpaper.png" 2>/dev/null
+    pkill -x diodon 2>/dev/null                  # histórico de copiar/colar (Win+V)
+    systemctl is-active -q bluetooth || pkill -x blueman-applet 2>/dev/null
+  else
+    [ -f "$S" ] && sed -i 's/^gtk-enable-animations=.*/gtk-enable-animations=1/' "$S"
+    dconf write /net/launchpad/plank/docks/dock1/zoom-enabled true
+    pgrep -x diodon >/dev/null || setsid diodon >/dev/null 2>&1 &
+    [ "$(sed -n 's/^papel = //p' "$HOME/.config/nova/config")" = vivo ] && { pgrep -x nova-papel >/dev/null || setsid "$B/nova-papel" >/dev/null 2>&1 & }
+  fi
+  [ -n "$DISPLAY" ] && setsid "$HOME/.local/bin/nova-icones" >/dev/null 2>&1 &
+}
+case "$1" in
+  on)  $CFG desempenho 1; aplicar; compositor; notify-send -t 4000 "Modo desempenho ligado" "Animações e efeitos desligados. O computador fica mais leve." 2>/dev/null ;;
+  off) $CFG desempenho 0; aplicar; compositor; notify-send -t 4000 "Modo desempenho desligado" "Animações e efeitos de volta." 2>/dev/null ;;
+  reaplicar) aplicar ;;
+  estado|"") on && echo 1 || echo 0 ;;
+  *) echo "uso: nova-desempenho on|off|estado"; exit 1 ;;
+esac
+exit 0

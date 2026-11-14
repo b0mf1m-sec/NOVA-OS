@@ -1,0 +1,16 @@
+#!/bin/sh
+# Sessão gráfica NOVA OS: Openbox + barra (tint2) + dock (plank)
+export PATH="$HOME/.local/bin:$PATH"
+export XDG_SESSION_TYPE=x11
+export XDG_CURRENT_DESKTOP=Openbox
+export XDG_SESSION_DESKTOP=Openbox
+[ -f "$HOME/.Xresources" ] && xrdb -nocpp -merge "$HOME/.Xresources"
+setxkbmap -model pc105 -layout br
+xsetroot -cursor_name left_ptr
+feh --no-fehbg --bg-fill "$HOME/.local/share/nova/wallpaper.png" || xsetroot -solid '#131116'
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+  exec dbus-launch --exit-with-session sh -c 'dbus-update-activation-environment DISPLAY XAUTHORITY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP; exec openbox-session'
+fi
+# barramento do systemd (login em tty): serviços como o bamf precisam saber do DISPLAY
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP
+exec openbox-session

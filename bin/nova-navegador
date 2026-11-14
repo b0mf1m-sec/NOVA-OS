@@ -1,0 +1,20 @@
+#!/bin/sh
+# Abre o navegador escolhido em Ajustes → Aplicativos (padrão: Firefox).
+#   nova-navegador [endereço]   |   nova-navegador --nova-aba | --nova-janela | --privada
+id=$("$HOME/.local/bin/nova-config" -g navegador firefox-esr.desktop)
+for d in "$HOME/.local/share/applications" /usr/share/applications; do [ -f "$d/$id" ] && f="$d/$id" && break; done
+[ -n "$f" ] || f=/usr/share/applications/firefox-esr.desktop
+case "$1" in
+  --nova-aba|--nova-janela|--privada)
+    A="$1"; CMD=$(sed -n 's/^Exec=//p' "$f" | head -1 | sed 's/ *%[a-zA-Z]//g')
+    case "$id:$A" in
+      firefox*:--nova-aba) set -- --new-tab about:newtab ;;
+      firefox*:--nova-janela) set -- --new-window ;;
+      firefox*:--privada) set -- --private-window ;;
+      *:--nova-aba) set -- --new-tab ;;
+      *:--nova-janela) set -- --new-window ;;
+      *:--privada) set -- --incognito ;;
+    esac
+    exec $CMD "$@" ;;
+esac
+exec gio launch "$f" "$@"

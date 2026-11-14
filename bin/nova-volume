@@ -1,0 +1,9 @@
+#!/bin/sh
+# Indicador de volume para a barra (tint2): 1ª linha = ícone, 2ª = texto (vazio: só o ícone)
+I="$HOME/.local/share/nova/barra"
+export LC_ALL=C
+v=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null) || { echo "$I/vol-mudo.png"; echo ""; exit 0; }
+p=$(echo "$v" | awk '{printf "%d", $2*100+0.5}')
+case "$v" in *MUTED*) echo "$I/vol-mudo.png"; echo ""; exit 0;; esac
+if [ "$p" -ge 40 ]; then echo "$I/vol-alto.png"; else echo "$I/vol-baixo.png"; fi
+echo ""

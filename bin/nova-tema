@@ -1,0 +1,530 @@
+#!/usr/bin/python3
+"""nova-tema: gera toda a aparência do sistema a partir de uma paleta.
+Uso:  nova-tema                  (reaplica)
+      nova-tema tema claro|escuro
+      nova-tema destaque azul|roxo|rosa|vermelho|laranja|verde|grafite
+      nova-tema papel NOME       (arquivo em ~/.local/share/nova/papeis/NOME-claro.png, ou "vivo")
+      nova-tema dock TAMANHO     (ícones da dock, 32 a 64)
+"""
+import os, sys, subprocess, configparser, shutil
+
+H = os.path.expanduser('~')
+CFG = f'{H}/.config/nova/config'
+SHARE = f'{H}/.local/share/nova'
+BAR = f'{SHARE}/barra'
+
+ACCENTS = {  # nome: (claro, escuro)
+    'azul': ('#007aff', '#0a84ff'), 'roxo': ('#a550e0', '#bf5af2'), 'rosa': ('#f0407a', '#ff5c93'),
+    'vermelho': ('#e5383b', '#ff453a'), 'laranja': ('#f08a1c', '#ff9f0a'), 'verde': ('#30b350', '#32d74b'),
+    'grafite': ('#6e6e73', '#98989d'),
+}
+PAL = {
+ 'claro': dict(bg='#f5f5f7', base='#ffffff', fg='#1d1d1f', fg2='#6e6e73', line='#d8d8dc', card='#ffffff', hover='#ebebee',
+               title='#e9e9ec', title_in='#f3f3f5', title_fg='#3a3a3c', title_fg_in='#a1a1a6', btn_in='#cfcfd4', border='#c4c4c9',
+               bar='#f6f6f8', bar_a=62, bar_fg='#1d1d1f', dock=(255, 255, 255, 105, 140), dock_in=(255, 255, 255, 170), dock_out=(0, 0, 0, 38),
+               glass='246,246,248', glass_a='.66', term_bg='#fbfbfd', term_fg='#1d1d1f',
+               ansi=['#3a3a3c', '#d70015', '#248a3d', '#b25000', '#0040dd', '#8944ab', '#0071a4', '#8e8e93',
+                     '#636366', '#ff3b30', '#34c759', '#ff9500', '#007aff', '#af52de', '#32ade6', '#1d1d1f']),
+ 'escuro': dict(bg='#1e1e20', base='#2a2a2d', fg='#f5f5f7', fg2='#98989d', line='#3a3a3d', card='#2c2c2f', hover='#38383b',
+               title='#2c2c2e', title_in='#252527', title_fg='#e5e5ea', title_fg_in='#6e6e73', btn_in='#4a4a4f', border='#0f0f10',
+               bar='#1c1c1e', bar_a=58, bar_fg='#f5f5f7', dock=(44, 44, 48, 130, 165), dock_in=(255, 255, 255, 42), dock_out=(0, 0, 0, 110),
+               glass='28,28,30', glass_a='.62', term_bg='#1c1c1e', term_fg='#f5f5f7',
+               ansi=['#3a3a3c', '#ff453a', '#32d74b', '#ffd60a', '#0a84ff', '#bf5af2', '#64d2ff', '#d1d1d6',
+                     '#8e8e93', '#ff6961', '#5ee27a', '#ffe14d', '#409cff', '#da8fff', '#8ee0ff', '#f5f5f7']),
+}
+
+def load():
+    c = configparser.ConfigParser(); c.read(CFG)
+    d = dict(tema='claro', destaque='azul', papel='ondas', dock='48')
+    if c.has_section('nova'): d.update(c['nova'])
+    return d
+
+def save(d):
+    c = configparser.ConfigParser(); c['nova'] = d
+    os.makedirs(os.path.dirname(CFG), exist_ok=True)
+    with open(CFG, 'w') as f: c.write(f)
+
+def w(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as f: f.write(text)
+
+def shade(hexc, k):  # k<1 escurece, k>1 clareia
+    r, g, b = (int(hexc[i:i + 2], 16) for i in (1, 3, 5))
+    f = (lambda v: int(v * k)) if k <= 1 else (lambda v: int(v + (255 - v) * (k - 1)))
+    return '#%02x%02x%02x' % tuple(max(0, min(255, f(v))) for v in (r, g, b))
+
+def svg2png(svg, out, size):
+    w(out + '.svg', svg)
+    subprocess.run(['rsvg-convert', '-w', str(size), '-h', str(size), out + '.svg', '-o', out + '.png'], check=False)
+    os.remove(out + '.svg')
+
+def bar_icons(fg, accent):
+    os.makedirs(BAR, exist_ok=True)
+    S = lambda body: f'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">{body}</svg>'
+    for lvl in range(0, 101, 10):
+        fillw = 38 * lvl / 100
+        col = '#ff453a' if lvl <= 10 else fg
+        base = (f'<rect x="5" y="20" width="46" height="24" rx="7" fill="none" stroke="{fg}" stroke-opacity=".55" stroke-width="3"/>'
+                f'<rect x="54" y="27" width="5" height="10" rx="2.5" fill="{fg}" fill-opacity=".55"/>'
+                f'<rect x="9" y="24" width="{fillw:.1f}" height="16" rx="3.5" fill="{col}"/>')
+        svg2png(S(base), f'{BAR}/bat-{lvl}', 64)
+        bolt = f'<path d="M31 14 L18 34 H27 L24 50 L38 29 H29 Z" fill="{fg}" stroke="{"#000" if fg.startswith("#f") else "#fff"}" stroke-opacity=".0"/>'
+        base_c = base.replace(f'fill="{col}"/>', f'fill="#34c759"/>')
+        svg2png(S(base_c + bolt), f'{BAR}/bat-{lvl}-c', 64)
+    spk = f'<path d="M8 25h10l13-11v36L18 39H8z" fill="{fg}"/>'
+    arc = lambda r, o=1: (f'<path d="M{33 + r * .707:.1f} {32 - r * .707:.1f} A{r} {r} 0 0 1 {33 + r * .707:.1f} {32 + r * .707:.1f}" '
+                          f'fill="none" stroke="{fg}" stroke-opacity="{o}" stroke-width="4.5" stroke-linecap="round"/>')
+    svg2png(S(spk + arc(9) + arc(18) + arc(27)), f'{BAR}/vol-alto', 64)
+    svg2png(S(spk + arc(9) + arc(18, .28) + arc(27, .28)), f'{BAR}/vol-baixo', 64)
+    svg2png(S(spk + f'<path d="M40 24l16 16M56 24L40 40" stroke="{fg}" stroke-width="4.5" stroke-linecap="round"/>'), f'{BAR}/vol-mudo', 64)
+    tog = (f'<rect x="8" y="12" width="48" height="16" rx="8" fill="none" stroke="{fg}" stroke-width="4"/><circle cx="18" cy="20" r="4.5" fill="{fg}"/>'
+           f'<rect x="8" y="36" width="48" height="16" rx="8" fill="{fg}"/><circle cx="46" cy="44" r="4.5" fill="{"#fff" if not fg.startswith("#f") else "#1c1c1e"}"/>')
+    svg2png(S(tog), f'{BAR}/central', 64)
+    grid = ''.join(f'<rect x="{9 + 17 * c}" y="{9 + 17 * r}" width="12" height="12" rx="4" fill="{fg}"/>' for r in range(3) for c in range(3))
+    svg2png(S(grid), f'{BAR}/apps', 64)
+    pw = (f'<path d="M20 18 A20 20 0 1 0 44 18" fill="none" stroke="{fg}" stroke-width="5" stroke-linecap="round"/>'
+          f'<path d="M32 8 V32" stroke="{fg}" stroke-width="5" stroke-linecap="round"/>')
+    svg2png(S(pw), f'{BAR}/desligar', 64)
+    rs = (f'<path d="M50 32 A18 18 0 1 1 44 18.5" fill="none" stroke="{fg}" stroke-width="5" stroke-linecap="round"/>'
+          f'<path d="M46 6 V20 H32" fill="none" stroke="{fg}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>')
+    svg2png(S(rs), f'{BAR}/reiniciar', 64)
+
+def main():
+    d = load(); a = sys.argv[1:]
+    if len(a) == 2 and a[0] in ('tema', 'destaque', 'papel', 'dock'):
+        if a[0] == 'tema' and a[1] not in PAL: sys.exit('tema: claro ou escuro')
+        if a[0] == 'destaque' and a[1] not in ACCENTS: sys.exit('destaque: ' + ', '.join(ACCENTS))
+        d[a[0]] = a[1]
+    elif a: sys.exit(__doc__)
+    save(d)
+    t = d['tema']; p = PAL[t]; dark = t == 'escuro'
+    acc = ACCENTS.get(d['destaque'], ACCENTS['azul'])[1 if dark else 0]
+    acc_hi, acc_lo = shade(acc, 1.22), shade(acc, .82)
+
+    # --- paleta lida pelos apps do NOVA OS e pelo GTK ---
+    pal = ''.join(f'@define-color {k} {v};\n' for k, v in dict(
+        bg=p['bg'], base=p['base'], fg=p['fg'], fg2=p['fg2'], line=p['line'], card=p['card'], hover=p['hover'],
+        accent=acc, accent_hi=acc_hi, accent_lo=acc_lo, danger='#ff453a' if dark else '#ff3b30', ok='#32d74b' if dark else '#28a745',
+        warn='#ff9f0a', glass=f"rgba({p['glass']},{p['glass_a']})").items())
+    w(f'{H}/.config/nova/paleta.css', pal)
+    w(f'{H}/.config/nova/tema', t + '\n')
+
+    # --- GTK ---
+    w(f'{H}/.config/gtk-3.0/settings.ini', f"""[Settings]
+gtk-theme-name=Adwaita
+gtk-application-prefer-dark-theme={1 if dark else 0}
+gtk-icon-theme-name={'Papirus-Dark' if dark else 'Papirus-Light'}
+gtk-font-name=Inter 10
+gtk-cursor-theme-name=Adwaita
+gtk-enable-animations=1
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle=hintslight
+gtk-xft-rgba=rgb
+""")
+    w(f'{H}/.gtkrc-2.0', f'gtk-icon-theme-name="{"Papirus-Dark" if dark else "Papirus-Light"}"\ngtk-font-name="Inter 10"\n')
+    w(f'{H}/.config/gtk-3.0/gtk.css', pal + f"""
+/* NOVA OS sobre o Adwaita: cores de sistema, cantos arredondados, transições suaves */
+@define-color theme_selected_bg_color {acc};
+@define-color theme_selected_fg_color #ffffff;
+@define-color theme_bg_color {p['bg']};
+@define-color theme_base_color {p['base']};
+@define-color theme_fg_color {p['fg']};
+@define-color theme_text_color {p['fg']};
+@define-color borders {p['line']};
+*:selected, selection {{ background-color: {acc}; color: #fff; }}
+button, entry, combobox button {{ border-radius: 8px; transition: all 180ms ease; }}
+entry:focus {{ border-color: {acc}; box-shadow: 0 0 0 3px alpha({acc},.28); }}
+button.suggested-action {{ background-image: none; background-color: {acc}; border-color: {acc}; color: #fff; }}
+button.suggested-action:hover {{ background-color: {acc_hi}; }}
+button.destructive-action {{ background-image: none; background-color: @danger; border-color: @danger; color: #fff; }}
+switch {{ border-radius: 999px; border: none; background-color: alpha({p['fg']},.18); transition: all 220ms ease; min-height: 22px; }}
+switch:checked {{ background-color: @ok; }}
+switch slider {{ border-radius: 999px; border: none; background-color: #fff; box-shadow: 0 1px 3px alpha(#000,.3); min-width: 20px; min-height: 20px; margin: 1px; }}
+scale trough {{ border-radius: 999px; min-height: 5px; border: none; background-color: alpha({p['fg']},.14); }}
+scale highlight {{ border-radius: 999px; background-color: {acc}; border: none; }}
+scale slider {{ border-radius: 999px; background-image: none; background-color: #fff; border: 1px solid alpha(#000,.12); box-shadow: 0 1px 4px alpha(#000,.25); min-width: 18px; min-height: 18px; }}
+progressbar progress {{ background-color: {acc}; background-image: none; border: none; border-radius: 999px; }}
+progressbar trough {{ border-radius: 999px; border: none; background-color: alpha({p['fg']},.12); }}
+menu, .menu, .context-menu, popover {{ border-radius: 10px; padding: 5px; border: 1px solid alpha({p['fg']},.12); }}
+menu menuitem {{ border-radius: 6px; padding: 5px 9px; }}
+menu menuitem:hover {{ background-color: {acc}; color: #fff; }}
+tooltip, tooltip.background {{ border-radius: 7px; }}
+scrollbar slider {{ border-radius: 999px; min-width: 6px; min-height: 6px; background-color: alpha({p['fg']},.28); }}
+scrollbar slider:hover {{ background-color: alpha({p['fg']},.45); }}
+*:focus {{ outline-color: alpha({acc},.6); }}
+""")
+
+    # --- barra (tint2): só o essencial ---
+    fgc = p['bar_fg']
+    w(f'{H}/.config/tint2/tint2rc', f"""# Gerado por nova-tema
+rounded = 0
+border_width = 0
+background_color = {p['bar']} {p['bar_a']}
+border_color = #000000 0
+
+rounded = 6
+border_width = 0
+background_color = {p['fg']} 0
+background_color_hover = {p['fg']} 12
+background_color_pressed = {p['fg']} 22
+border_color = #000000 0
+
+rounded = 7
+border_width = 1
+background_color = {p['base']} 96
+border_color = {p['line']} 100
+
+panel_items = PFSEEPCPP
+panel_monitor = all
+panel_position = top center horizontal
+panel_size = 100% 28
+panel_margin = 0 0
+panel_padding = 8 2 4
+panel_background_id = 1
+wm_menu = 1
+panel_dock = 0
+panel_layer = top
+strut_policy = follow_size
+autohide = 0
+font_shadow = 0
+disable_transparency = 1
+mouse_effects = 1
+
+button = new
+button_icon = {SHARE}/barra/apps.png
+button_text = Apps
+button_font = Inter Semi-Bold 10
+button_font_color = {fgc} 100
+button_lclick_command = {H}/.local/bin/nova-apps
+button_rclick_command = xterm
+button_tooltip = Todos os aplicativos
+button_padding = 8 0 6
+button_background_id = 2
+button_max_icon_size = 13
+button_centered = 1
+
+systray_padding = 6 0 8
+systray_background_id = 0
+systray_sort = ascending
+systray_icon_size = 16
+systray_icon_asb = 100 0 0
+
+execp = new
+execp_command = {H}/.local/bin/nova-bateria
+execp_interval = 20
+execp_has_icon = 1
+execp_cache_icon = 0
+execp_continuous = 0
+execp_markup = 0
+execp_icon_w = 22
+execp_icon_h = 22
+execp_font = Inter Medium 9
+execp_font_color = {fgc} 100
+execp_padding = 6 0 3
+execp_background_id = 2
+execp_centered = 1
+execp_tooltip = Bateria
+execp_lclick_command = {H}/.local/bin/nova-central
+
+execp = new
+execp_command = {H}/.local/bin/nova-volume
+execp_interval = 2
+execp_has_icon = 1
+execp_cache_icon = 0
+execp_continuous = 0
+execp_markup = 0
+execp_icon_w = 16
+execp_icon_h = 16
+execp_font = Inter Medium 9
+execp_font_color = {fgc} 100
+execp_padding = 6 0 0
+execp_background_id = 2
+execp_centered = 1
+execp_tooltip = Volume: clique para silenciar, role para ajustar
+execp_lclick_command = wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+execp_uwheel_command = wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
+execp_dwheel_command = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+
+button = new
+button_icon = {SHARE}/barra/central.png
+button_lclick_command = {H}/.local/bin/nova-central
+button_tooltip = Central de controle
+button_padding = 8 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+time1_format = %a %d %b   %H:%M
+time1_font = Inter Medium 10
+clock_font_color = {fgc} 100
+clock_padding = 8 0
+clock_background_id = 2
+clock_tooltip = %A, %d de %B de %Y
+clock_lclick_command = {H}/.local/bin/nova-central
+
+button = new
+button_icon = {SHARE}/barra/reiniciar.png
+button_lclick_command = {H}/.local/bin/nova-energia reiniciar
+button_tooltip = Reiniciar o computador
+button_padding = 7 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+button = new
+button_icon = {SHARE}/barra/desligar.png
+button_lclick_command = {H}/.local/bin/nova-energia desligar
+button_tooltip = Desligar o computador
+button_padding = 9 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+tooltip_show_timeout = 0.4
+tooltip_hide_timeout = 0.1
+tooltip_padding = 8 5
+tooltip_background_id = 3
+tooltip_font_color = {p['fg']} 100
+tooltip_font = Inter 9
+""")
+    bar_icons(fgc, acc)
+
+    # --- dock (plank) ---
+    dk = p['dock']; c4 = lambda t4: ';;'.join(str(x) for x in t4)
+    w(f'{H}/.local/share/plank/themes/Nova/dock.theme', f"""[PlankTheme]
+TopRoundness=20
+BottomRoundness=20
+LineWidth=1
+OuterStrokeColor={c4(p['dock_out'])}
+FillStartColor={c4(dk[:3] + (dk[3],))}
+FillEndColor={c4(dk[:3] + (dk[4],))}
+InnerStrokeColor={c4(p['dock_in'])}
+
+[PlankDockTheme]
+HorizPadding=1.4
+TopPadding=1.4
+BottomPadding=1.4
+ItemPadding=2.4
+IndicatorSize=4
+IconShadowSize=1.5
+UrgentBounceHeight=1.6
+LaunchBounceHeight=0.9
+FadeOpacity=1
+ClickTime=280
+UrgentBounceTime=600
+LaunchBounceTime=620
+ActiveTime=280
+SlideTime=320
+FadeTime=220
+HideTime=260
+GlowSize=28
+GlowTime=10000
+GlowPulseTime=2000
+UrgentHueShift=150
+ItemMoveTime=420
+CascadeHide=true
+BadgeColor=255;;59;;48;;255
+""")
+    subprocess.run(['dconf', 'write', '/net/launchpad/plank/docks/dock1/icon-size', d['dock']], check=False)
+
+    # --- janelas (openbox) ---
+    ob = f'{H}/.themes/Nova/openbox-3'
+    circle = '0x00, 0x00, 0xe0, 0x01, 0xf8, 0x07, 0xfc, 0x0f, 0xfc, 0x0f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfc, 0x0f, 0xfc, 0x0f, 0xf8, 0x07, 0xe0, 0x01, 0x00, 0x00'
+    for n in ('close', 'iconify', 'max', 'max_toggled'):
+        w(f'{ob}/{n}.xbm', f'#define {n}_width 14\n#define {n}_height 14\nstatic unsigned char {n}_bits[] = {{\n  {circle}\n}};\n')
+    def btn(name, col):
+        s = ''
+        for st, c in (('unpressed', col), ('hover', shade(col, 1.25)), ('pressed', shade(col, .8))):
+            s += f'window.active.button.{name}.{st}.image.color: {c}\n'
+            if st != 'pressed': s += f'window.active.button.{name}.toggled.{st}.image.color: {c}\n'
+        s += f'window.inactive.button.{name}.unpressed.image.color: {p["btn_in"]}\nwindow.inactive.button.{name}.hover.image.color: {col}\n'
+        s += f'window.inactive.button.{name}.toggled.unpressed.image.color: {p["btn_in"]}\n'
+        return s
+    w(f'{ob}/themerc', f"""# Gerado por nova-tema
+border.width: 1
+padding.width: 10
+padding.height: 7
+window.handle.width: 0
+window.client.padding.width: 0
+window.client.padding.height: 0
+window.label.text.justify: center
+window.active.border.color: {p['border']}
+window.inactive.border.color: {p['border']}
+window.active.title.separator.color: {p['line']}
+window.inactive.title.separator.color: {p['line']}
+window.active.client.color: {p['bg']}
+window.inactive.client.color: {p['bg']}
+window.active.title.bg: flat solid
+window.active.title.bg.color: {p['title']}
+window.inactive.title.bg: flat solid
+window.inactive.title.bg.color: {p['title_in']}
+window.active.label.bg: parentrelative
+window.active.label.text.color: {p['title_fg']}
+window.inactive.label.bg: parentrelative
+window.inactive.label.text.color: {p['title_fg_in']}
+window.active.handle.bg: flat solid
+window.active.handle.bg.color: {p['title']}
+window.inactive.handle.bg: flat solid
+window.inactive.handle.bg.color: {p['title_in']}
+window.active.grip.bg: parentrelative
+window.inactive.grip.bg: parentrelative
+window.*.button.*.bg: parentrelative
+window.active.button.unpressed.image.color: {p['btn_in']}
+window.active.button.disabled.image.color: {p['btn_in']}
+window.inactive.button.unpressed.image.color: {p['btn_in']}
+window.inactive.button.disabled.image.color: {p['btn_in']}
+{btn('close', '#ff5f57')}{btn('iconify', '#febc2e')}{btn('max', '#28c840')}
+menu.border.width: 1
+menu.border.color: {p['line']}
+menu.overlap.x: -4
+menu.overlap.y: 0
+menu.separator.color: {p['line']}
+menu.separator.width: 1
+menu.separator.padding.width: 8
+menu.separator.padding.height: 5
+menu.title.bg: flat solid
+menu.title.bg.color: {p['base']}
+menu.title.text.color: {p['fg2']}
+menu.title.text.justify: left
+menu.items.bg: flat solid
+menu.items.bg.color: {p['base']}
+menu.items.text.color: {p['fg']}
+menu.items.disabled.text.color: {p['fg2']}
+menu.items.active.bg: flat solid
+menu.items.active.bg.color: {acc}
+menu.items.active.text.color: #ffffff
+menu.items.active.disabled.text.color: {p['fg2']}
+osd.border.width: 1
+osd.border.color: {p['line']}
+osd.bg: flat solid
+osd.bg.color: {p['base']}
+osd.label.bg: parentrelative
+osd.label.text.color: {p['fg']}
+osd.hilight.bg: flat solid
+osd.hilight.bg.color: {acc}
+osd.unhilight.bg: flat solid
+osd.unhilight.bg.color: {p['line']}
+""")
+
+    # --- terminal ---
+    an = p['ansi']
+    w(f'{H}/.Xresources', """! Terminal — gerado por nova-tema
+XTerm*termName: xterm-256color
+XTerm*locale: true
+XTerm*faceName: JetBrains Mono
+XTerm*faceSize: 11
+XTerm*internalBorder: 14
+XTerm*borderWidth: 0
+XTerm*scrollBar: false
+XTerm*saveLines: 5000
+XTerm*selectToClipboard: true
+XTerm*VT100.translations: #override \\
+    Ctrl Shift <Key>C: copy-selection(CLIPBOARD) \\n\\
+    Ctrl Shift <Key>V: insert-selection(CLIPBOARD) \\n\\
+    Ctrl <Key>Insert: copy-selection(CLIPBOARD) \\n\\
+    Shift <Key>Insert: insert-selection(CLIPBOARD) \\n\\
+    <Btn2Up>: insert-selection(CLIPBOARD, PRIMARY)
+XTerm*metaSendsEscape: true
+XTerm*cursorBlink: true
+""" + f"XTerm*background: {p['term_bg']}\nXTerm*foreground: {p['term_fg']}\nXTerm*cursorColor: {acc}\nXTerm*highlightColor: {acc}\nXTerm*highlightTextColor: #ffffff\n"
+        + ''.join(f'XTerm*color{i}: {c}\n' for i, c in enumerate(an)) + 'Xcursor.size: 24\n')
+
+    # --- papel de parede (e cópia desfocada para o vidro dos apps e do login) ---
+    papel = d['papel'] if d['papel'] != 'vivo' else 'ondas'
+    src = f'{SHARE}/papeis/{papel}-{t}.png'
+    if not os.path.exists(src): src = f'{SHARE}/papeis/{papel}.png'
+    if not os.path.exists(src): src = f'{SHARE}/papeis/ondas-{t}.png'
+    blur = src[:-4] + '-blur.png'
+    if not os.path.exists(blur):
+        subprocess.run(['convert', src, '-resize', '25%', '-blur', '0x9', '-resize', '400%', '-modulate', '104,118', blur], check=False)
+    shutil.copyfile(src, f'{SHARE}/wallpaper.png'); shutil.copyfile(blur, f'{SHARE}/wallpaper-blur.png')
+    for a_, b_ in ((src, 'login-bg.png'), (blur, 'login-blur.png')):
+        subprocess.run(['sudo', '-n', '/usr/local/sbin/nova-admin', 'install-nova', a_, b_], check=False, stderr=subprocess.DEVNULL)
+    subprocess.run(['sudo', '-n', '/usr/local/sbin/nova-admin', 'install-nova', f'{H}/.config/nova/paleta.css', 'paleta.css'], check=False, stderr=subprocess.DEVNULL)
+
+    # --- notificações (dunst) ---
+    w(f'{H}/.config/dunst/dunstrc', f"""[global]
+    monitor = 0
+    follow = none
+    width = 350
+    height = (0, 180)
+    origin = top-right
+    offset = (12, 40)
+    notification_limit = 4
+    progress_bar = true
+    progress_bar_height = 6
+    progress_bar_frame_width = 0
+    progress_bar_min_width = 310
+    progress_bar_max_width = 310
+    progress_bar_corner_radius = 3
+    indicate_hidden = yes
+    transparency = 4
+    separator_height = 0
+    padding = 14
+    horizontal_padding = 16
+    text_icon_padding = 14
+    frame_width = 1
+    frame_color = "{p['line']}"
+    gap_size = 8
+    sort = yes
+    font = Inter 10
+    line_height = 2
+    markup = full
+    format = "<b>%s</b>\\n%b"
+    alignment = left
+    vertical_alignment = center
+    show_age_threshold = -1
+    ellipsize = end
+    ignore_newline = no
+    stack_duplicates = true
+    hide_duplicate_count = true
+    icon_position = left
+    min_icon_size = 34
+    max_icon_size = 40
+    icon_theme = "{'Papirus-Dark' if dark else 'Papirus-Light'}"
+    enable_recursive_icon_lookup = true
+    corner_radius = 14
+    mouse_left_click = close_current
+    mouse_middle_click = close_all
+    mouse_right_click = do_action, close_current
+[urgency_low]
+    background = "{p['base']}"
+    foreground = "{p['fg']}"
+    highlight = "{acc}"
+    timeout = 4
+[urgency_normal]
+    background = "{p['base']}"
+    foreground = "{p['fg']}"
+    highlight = "{acc}"
+    timeout = 6
+[urgency_critical]
+    background = "{p['base']}"
+    foreground = "{p['fg']}"
+    frame_color = "#ff453a"
+    highlight = "#ff453a"
+    timeout = 0
+""")
+
+    # --- recarregar o que estiver rodando ---
+    if os.environ.get('DISPLAY'):
+        q = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['xrdb', '-nocpp', '-merge', f'{H}/.Xresources'], **q)
+        subprocess.run(['openbox', '--reconfigure'], **q)
+        subprocess.run(['pkill', '-USR1', '-x', 'tint2'], **q)
+        if subprocess.run(['pgrep', '-x', 'dunst'], **q).returncode == 0:
+            subprocess.run(['pkill', '-x', 'dunst'], **q); subprocess.Popen(['dunst'], **q)
+        leve = subprocess.run([f'{H}/.local/bin/nova-desempenho', 'estado'], capture_output=True, text=True).stdout.strip() == '1'
+        if d['papel'] == 'vivo' and not leve:
+            if subprocess.run(['pgrep', '-x', 'nova-papel'], **q).returncode: subprocess.Popen([f'{H}/.local/bin/nova-papel'], **q)
+            else: subprocess.run(['pkill', '-USR1', '-x', 'nova-papel'], **q)
+        else:
+            subprocess.run(['pkill', '-x', 'nova-papel'], **q)
+            subprocess.run(['feh', '--no-fehbg', '--bg-fill', f'{SHARE}/wallpaper.png'], **q)
+        subprocess.run([f'{H}/.local/bin/nova-icones'], **q)
+        if subprocess.run(['pgrep', '-x', 'plank'], **q).returncode == 0:
+            subprocess.run(['pkill', '-x', 'plank'], **q); subprocess.Popen(['plank'], **q)
+    subprocess.run([f'{H}/.local/bin/nova-desempenho', 'reaplicar'], check=False)
+    print(f"tema={t} destaque={d['destaque']} papel={d['papel']}")
+
+main()

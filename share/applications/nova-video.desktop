@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Vídeo
+Comment=Reproduzir vídeos (mpv)
+Exec=mpv --player-operation-mode=pseudo-gui -- %U
+Icon=@HOME@/.local/share/nova/icons/video.png
+Terminal=false
+StartupWMClass=mpv
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;video/mpeg;audio/mpeg;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=mpv --player-operation-mode=pseudo-gui -- %U

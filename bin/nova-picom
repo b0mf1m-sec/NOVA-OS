@@ -1,0 +1,13 @@
+#!/bin/sh
+# Compositor NOVA OS: tenta o perfil com vidro fosco (glx + desfoque); se não subir, usa o perfil simples (xrender).
+# Para forçar o simples: crie o arquivo ~/.config/picom/sem-vidro
+C="$HOME/.config/picom"
+# Modo desempenho: perfil sem efeitos
+[ "$("$HOME/.local/bin/nova-config" -g desempenho 0)" = 1 ] && [ -f "$C/picom-leve.conf" ] && exec picom --config "$C/picom-leve.conf"
+if [ ! -e "$C/sem-vidro" ]; then
+  picom --config "$C/picom-glx.conf" &
+  P=$!
+  sleep 1.5
+  kill -0 $P 2>/dev/null && { wait $P; exit; }
+fi
+exec picom --config "$C/picom.conf"

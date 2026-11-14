@@ -1,0 +1,3 @@
+#!/bin/sh
+# Sessão NOVA OS: reaproveita o mesmo ~/.xinitrc usado no startx
+exec sh "$HOME/.xinitrc"

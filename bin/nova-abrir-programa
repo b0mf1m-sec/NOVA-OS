@@ -1,0 +1,11 @@
+#!/bin/sh
+# Abre programas baixados da internet: .AppImage (roda direto), .deb (instala), .exe/.msi (Windows, via Wine).
+f="$1"; n=$(basename "$f"); W=/usr/share/icons/Papirus/48x48/status/dialog-information.svg
+case "$(echo "$n" | tr 'A-Z' 'a-z')" in
+  *.appimage) chmod +x "$f" && exec "$f" ;;
+  *.deb) exec xterm -T "Instalando $n" -e sh -c 'echo "Instalando o programa. Aguarde..."; echo; sudo apt-get install -y "$1"; echo; echo "Pronto. O programa aparece em Apps. Pode fechar esta janela (Enter)."; read x' sh "$f" ;;
+  *.exe|*.msi)
+    if command -v wine >/dev/null; then exec wine "$f"
+    else notify-send -t 9000 -i "$W" "Programa do Windows" "Para abrir \"$n\", instale antes \"Programas do Windows\" na Loja (categoria Ferramentas)."; exec "$HOME/.local/bin/nova-loja"; fi ;;
+  *) exec xdg-open "$f" ;;
+esac

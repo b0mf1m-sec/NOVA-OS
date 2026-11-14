@@ -1,0 +1,15 @@
+#!/bin/sh
+# Instala/remove pacotes para a Loja. Uso: nova-apt install|remove PACOTE...
+# 1) tenta o ajudante sem senha; 2) se falhar, pede a senha numa janela e usa o sudo.
+A="$1"; shift
+for p in "$@"; do case "$p" in *[!a-z0-9+.-]*|-*|"") echo "nome de pacote invalido" >&2; exit 2 ;; esac; done
+[ $# -gt 0 ] || exit 2
+case "$A" in install|remove) ;; *) exit 2 ;; esac
+sudo -n /usr/local/sbin/nova-admin apt-update >/dev/null 2>&1
+if sudo -n /usr/local/sbin/nova-admin apt-$A "$@" 2>&1; then exit 0; fi
+# plano B: pedir a senha
+[ "$A" = install ] && V=instalar || V=remover
+SEN=$(zenity --password --title="NOVA OS" --text="Digite a senha do computador para $V" 2>/dev/null) || { echo "Error: cancelado" >&2; exit 1; }
+printf '%s\n' "$SEN" | sudo -S -p '' -k env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -c 'apt-get update -qq >/dev/null 2>&1; apt-get '"$A"' -y -o APT::Status-Fd=1 "$@"' sh "$@" 2>&1
+r=$?; [ $r -eq 0 ] || echo "Error: nao foi possivel (senha incorreta ou pacote indisponivel)" >&2
+exit $r

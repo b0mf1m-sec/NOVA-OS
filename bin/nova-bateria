@@ -1,0 +1,9 @@
+#!/bin/sh
+# Indicador de bateria para a barra (tint2): 1ª linha = ícone, 2ª = texto
+I="$HOME/.local/share/nova/barra"
+B=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
+[ -z "$B" ] && { echo "$I/bat-100-c.png"; echo ""; exit 0; }
+p=$(cat "$B/capacity" 2>/dev/null || echo 0); s=$(cat "$B/status" 2>/dev/null)
+l=$(( (p + 5) / 10 * 10 )); [ "$l" -gt 100 ] && l=100
+case "$s" in Charging|Full|"Not charging") echo "$I/bat-$l-c.png";; *) echo "$I/bat-$l.png";; esac
+echo "$p%"

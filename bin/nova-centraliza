@@ -1,0 +1,19 @@
+#!/bin/bash
+# Centraliza na tela janelas pequenas (avisos, confirmações) assim que abrem.
+# Janelas grandes, docks e os apps de tela cheia do NOVA ficam como estão.
+SW=$(xdotool getdisplaygeometry | cut -d' ' -f1); SH=$(xdotool getdisplaygeometry | cut -d' ' -f2)
+vistas=" $(xprop -root _NET_CLIENT_LIST | grep -o '0x[0-9a-f]*' | tr '\n' ' ')"
+xprop -root -spy _NET_CLIENT_LIST | while read -r _; do
+  sleep 0.4
+  lista=$(xprop -root _NET_CLIENT_LIST | grep -o '0x[0-9a-f]*')
+  for w in $lista; do
+    case "$vistas" in *" $w "*) continue;; esac
+    vistas="$vistas$w "
+    info=$(xprop -id "$w" _NET_WM_WINDOW_TYPE WM_CLASS _NET_WM_STATE 2>/dev/null)
+    echo "$info" | grep -qE 'TYPE_(DOCK|DESKTOP|MENU|TOOLTIP|NOTIFICATION|SPLASH)|Nova-|plank|dunst|FULLSCREEN|MAXIMIZED' && continue
+    eval "$(xdotool getwindowgeometry --shell "$w" 2>/dev/null)"
+    [ -n "$WIDTH" ] || continue
+    [ "$WIDTH" -gt $((SW*8/10)) ] || [ "$HEIGHT" -gt $((SH*8/10)) ] && continue
+    xdotool windowmove "$w" $(( (SW-WIDTH)/2 )) $(( (SH-HEIGHT)/2 ))
+  done
+done

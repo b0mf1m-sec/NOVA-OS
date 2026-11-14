@@ -1,0 +1,8 @@
+#!/bin/sh
+# Opções do NOVA OS em ~/.config/nova/opcoes (chave=valor).
+#   nova-config CHAVE VALOR      grava
+#   nova-config -g CHAVE [PADRAO]  lê (mostra PADRAO se não houver)
+F="$HOME/.config/nova/opcoes"; mkdir -p "$(dirname "$F")"; touch "$F"
+if [ "$1" = -g ]; then v=$(sed -n "s/^$2=//p" "$F" | tail -1); echo "${v:-$3}"
+elif [ $# -ge 2 ]; then grep -v "^$1=" "$F" > "$F.tmp"; echo "$1=$2" >> "$F.tmp"; mv "$F.tmp" "$F"
+else sed -n "s/^$1=//p" "$F" | tail -1; fi

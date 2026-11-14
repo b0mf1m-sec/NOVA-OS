@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Application
+Name=Navegador
+Comment=Navegar na internet (Firefox)
+Exec=@HOME@/.local/bin/nova-navegador %u
+Icon=@HOME@/.local/share/nova/icons/navegador.png
+Terminal=false
+
+Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
+StartupWMClass=Navigator
+
+Actions=nova-aba;nova-janela;nova-privada;
+
+[Desktop Action nova-aba]
+Name=Abrir nova aba
+Exec=@HOME@/.local/bin/nova-navegador --nova-aba
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=@HOME@/.local/bin/nova-navegador --nova-janela
+
+[Desktop Action nova-privada]
+Name=Abrir janela privada
+Exec=@HOME@/.local/bin/nova-navegador --privada

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Loja
+Comment=Instalar programas com um clique
+Exec=@HOME@/.local/bin/nova-loja
+Icon=@HOME@/.local/share/nova/icons/loja.png
+Terminal=false
+StartupWMClass=Nova-loja
+Categories=System;PackageManager;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=@HOME@/.local/bin/nova-loja

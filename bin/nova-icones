@@ -1,0 +1,25 @@
+#!/bin/sh
+# Ícones da Área de trabalho (arquivos e pastas, arrastar e soltar, downloads salvos lá).
+# Uso: nova-icones   (liga/atualiza; chamado no início da sessão e a cada troca de papel de parede)
+# Com o papel de parede animado ("vivo") e sem Modo desempenho, os ícones ficam desligados: a janela deles taparia a animação.
+command -v pcmanfm >/dev/null || exit 0
+C="$HOME/.config/pcmanfm/default"; mkdir -p "$C" "$(xdg-user-dir DESKTOP)"
+papel=$(sed -n 's/^papel = //p' "$HOME/.config/nova/config"); leve=$("$HOME/.local/bin/nova-config" -g desempenho 0)
+if [ "$papel" = vivo ] && [ "$leve" != 1 ]; then pkill -x pcmanfm; exit 0; fi
+cat > "$C/desktop-items-0.conf" <<EOT
+[*]
+wallpaper_mode=crop
+wallpaper_common=1
+wallpaper=$HOME/.local/share/nova/wallpaper.png
+desktop_bg=#131116
+desktop_fg=#ffffff
+desktop_shadow=#000000
+desktop_font=Inter 11
+show_wm_menu=0
+sort=name;ascending;
+show_documents=0
+show_trash=0
+show_mounts=0
+EOT
+if pgrep -x pcmanfm >/dev/null; then pcmanfm --set-wallpaper="$HOME/.local/share/nova/wallpaper.png" --wallpaper-mode=crop
+else pcmanfm --desktop --profile default & fi

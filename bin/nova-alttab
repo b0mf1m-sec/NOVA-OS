@@ -1,0 +1,6 @@
+#!/bin/sh
+# Alt+Tab do NOVA OS: avisa o serviço nova-janelas (e o inicia se não estiver rodando).  Uso: nova-alttab [prev]
+pid=$(pgrep -xo nova-janelas)
+[ -n "$pid" ] || { "$HOME/.local/bin/nova-janelas" >/dev/null 2>&1 & sleep 0.6; pid=$(pgrep -xo nova-janelas); }
+[ -n "$pid" ] || exit 1
+if [ "$1" = prev ]; then kill -USR2 "$pid"; else kill -USR1 "$pid"; fi

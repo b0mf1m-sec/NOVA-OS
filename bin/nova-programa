@@ -1,0 +1,50 @@
+#!/bin/sh
+# NOVA OS - ações do clique direito num programa (grade de Apps).
+#   nova-programa info ARQ.desktop          -> mostra "apt PACOTE", "flatpak ID" ou "fixo" (faz parte do sistema)
+#   nova-programa admin ARQ.desktop         -> abre como administrador (pergunta antes)
+#   nova-programa desinstalar ARQ.desktop   -> remove o programa (pergunta antes); dá para instalar de novo pela Loja
+F="$2"; [ -f "$F" ] || exit 1
+NOME=$(sed -n 's/^Name\[pt_BR\]=//p' "$F" | head -1); [ -n "$NOME" ] || NOME=$(sed -n 's/^Name=//p' "$F" | head -1)
+ICO=/usr/share/icons/Papirus/48x48/status/dialog-information.svg
+info() {
+  case "$F" in
+    */flatpak/*) echo "flatpak $(basename "$F" .desktop)"; return ;;
+    "$HOME"/*) echo fixo; return ;;
+  esac
+  P=$(dpkg -S "$(readlink -f "$F")" 2>/dev/null | head -1 | cut -d: -f1)
+  [ -n "$P" ] || { echo fixo; return; }
+  case "$P" in                                   # peças do sistema: não oferecer remoção
+    diodon|mpv|zathura*|flameshot|imagemagick*|python3*|nm-connection-editor|xdg-desktop-portal*|xcape|udiskie|inotify-tools|xinput|firefox-esr|pcmanfm|xterm|openbox|plank|tint2|picom|lightdm*|network-manager*|pulseaudio*|pipewire*|pavucontrol|dunst|zenity|blueman|clamav*|ufw|feh|libc*|gtk*|systemd*|apt|dpkg|sudo) echo fixo; return ;;
+  esac
+  PR=$(dpkg-query -W -f='${Essential} ${Priority}' "$P" 2>/dev/null)
+  case "$PR" in yes*|*required|*important) echo fixo; return ;; esac
+  echo "apt $P"
+}
+case "$1" in
+  info) info ;;
+  admin)
+    CMD=$(sed -n 's/^Exec=//p' "$F" | head -1 | sed 's/ *%[a-zA-Z]//g')
+    [ -n "$CMD" ] || exit 1
+    zenity --question --title="NOVA OS" --icon=dialog-password --width=420 \
+      --text="<span size='large' weight='bold'>Abrir \"$NOME\" como administrador?</span>\n\nComo administrador o programa pode mudar qualquer parte do sistema. Use só quando for mesmo preciso." \
+      --ok-label="Abrir como administrador" --cancel-label="Cancelar" 2>/dev/null || exit 0
+    # pede a senha numa janela (o sudo sem senha só vale para as ações fixas do NOVA OS)
+    SEN=$(zenity --password --title="NOVA OS" --text="Digite a senha do computador para continuar" 2>/dev/null) || exit 0
+    printf '%s\n' "$SEN" | sudo -S -p '' -k -H env DISPLAY="$DISPLAY" XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" sh -c "$CMD" \
+      || zenity --error --title="NOVA OS" --width=360 --text="Senha incorreta ou o programa não pôde abrir como administrador." 2>/dev/null ;;
+  desinstalar)
+    set -- $(info); TIPO="$1"; ALVO="$2"
+    [ "$TIPO" = fixo ] && { zenity --info --title="NOVA OS" --width=380 --text="\"$NOME\" faz parte do sistema e não pode ser removido." 2>/dev/null; exit 0; }
+    zenity --question --title="NOVA OS" --icon=edit-delete --width=420 \
+      --text="<span size='large' weight='bold'>Desinstalar \"$NOME\"?</span>\n\nO programa sai do computador. Se quiser de volta, é só instalar de novo pela Loja." \
+      --ok-label="Desinstalar" --cancel-label="Cancelar" 2>/dev/null || exit 0
+    LOG="$HOME/.cache/nova-desinstalar.log"
+    ( if [ "$TIPO" = flatpak ]; then flatpak uninstall -y --noninteractive "$ALVO" || sudo -n /usr/local/sbin/nova-admin flatpak-remove "$ALVO"
+      else sudo -n /usr/local/sbin/nova-admin apt-remove "$ALVO"; fi ) >"$LOG" 2>&1 &
+    PID=$!
+    ( while kill -0 $PID 2>/dev/null; do echo "# Removendo $NOME..."; sleep 0.5; done ) | zenity --progress --pulsate --auto-close --no-cancel --title="NOVA OS" --width=380 --text="Removendo $NOME..." 2>/dev/null
+    if wait $PID; then update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+      notify-send -t 6000 -i "$ICO" "Programa removido" "\"$NOME\" foi desinstalado. Para ter de volta, use a Loja."
+    else zenity --error --title="NOVA OS" --width=400 --text="Não foi possível remover \"$NOME\".\n\nFeche o programa, se estiver aberto, e tente de novo." 2>/dev/null; fi ;;
+  *) exit 1 ;;
+esac

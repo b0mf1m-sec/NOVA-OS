@@ -1,0 +1,130 @@
+# Gerado por nova-tema
+rounded = 0
+border_width = 0
+background_color = #1c1c1e 58
+border_color = #000000 0
+
+rounded = 6
+border_width = 0
+background_color = #f5f5f7 0
+background_color_hover = #f5f5f7 12
+background_color_pressed = #f5f5f7 22
+border_color = #000000 0
+
+rounded = 7
+border_width = 1
+background_color = #2a2a2d 96
+border_color = #3a3a3d 100
+
+panel_items = PFSEEPCPP
+panel_monitor = all
+panel_position = top center horizontal
+panel_size = 100% 28
+panel_margin = 0 0
+panel_padding = 8 2 4
+panel_background_id = 1
+wm_menu = 1
+panel_dock = 0
+panel_layer = top
+strut_policy = follow_size
+autohide = 0
+font_shadow = 0
+disable_transparency = 1
+mouse_effects = 1
+
+button = new
+button_icon = @HOME@/.local/share/nova/barra/apps.png
+button_text = Apps
+button_font = Inter Semi-Bold 10
+button_font_color = #f5f5f7 100
+button_lclick_command = @HOME@/.local/bin/nova-apps
+button_rclick_command = xterm
+button_tooltip = Todos os aplicativos
+button_padding = 8 0 6
+button_background_id = 2
+button_max_icon_size = 13
+button_centered = 1
+
+systray_padding = 6 0 8
+systray_background_id = 0
+systray_sort = ascending
+systray_icon_size = 16
+systray_icon_asb = 100 0 0
+
+execp = new
+execp_command = @HOME@/.local/bin/nova-bateria
+execp_interval = 20
+execp_has_icon = 1
+execp_cache_icon = 0
+execp_continuous = 0
+execp_markup = 0
+execp_icon_w = 22
+execp_icon_h = 22
+execp_font = Inter Medium 9
+execp_font_color = #f5f5f7 100
+execp_padding = 6 0 3
+execp_background_id = 2
+execp_centered = 1
+execp_tooltip = Bateria
+execp_lclick_command = @HOME@/.local/bin/nova-central
+
+execp = new
+execp_command = @HOME@/.local/bin/nova-volume
+execp_interval = 2
+execp_has_icon = 1
+execp_cache_icon = 0
+execp_continuous = 0
+execp_markup = 0
+execp_icon_w = 16
+execp_icon_h = 16
+execp_font = Inter Medium 9
+execp_font_color = #f5f5f7 100
+execp_padding = 6 0 0
+execp_background_id = 2
+execp_centered = 1
+execp_tooltip = Volume: clique para silenciar, role para ajustar
+execp_lclick_command = wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+execp_uwheel_command = wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
+execp_dwheel_command = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+
+button = new
+button_icon = @HOME@/.local/share/nova/barra/central.png
+button_lclick_command = @HOME@/.local/bin/nova-central
+button_tooltip = Central de controle
+button_padding = 8 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+time1_format = %a %d %b   %H:%M
+time1_font = Inter Medium 10
+clock_font_color = #f5f5f7 100
+clock_padding = 8 0
+clock_background_id = 2
+clock_tooltip = %A, %d de %B de %Y
+clock_lclick_command = @HOME@/.local/bin/nova-central
+
+button = new
+button_icon = @HOME@/.local/share/nova/barra/reiniciar.png
+button_lclick_command = @HOME@/.local/bin/nova-energia reiniciar
+button_tooltip = Reiniciar o computador
+button_padding = 7 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+button = new
+button_icon = @HOME@/.local/share/nova/barra/desligar.png
+button_lclick_command = @HOME@/.local/bin/nova-energia desligar
+button_tooltip = Desligar o computador
+button_padding = 9 0
+button_background_id = 2
+button_max_icon_size = 15
+button_centered = 1
+
+tooltip_show_timeout = 0.4
+tooltip_hide_timeout = 0.1
+tooltip_padding = 8 5
+tooltip_background_id = 3
+tooltip_font_color = #f5f5f7 100
+tooltip_font = Inter 9

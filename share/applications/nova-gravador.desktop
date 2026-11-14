@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Gravador
+Comment=Gravar áudio pelo microfone
+Exec=@HOME@/.local/bin/nova-gravador
+Icon=@HOME@/.local/share/nova/icons/gravador.png
+Terminal=false
+StartupWMClass=Nova-gravador
+Categories=AudioVideo;Audio;Recorder;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=@HOME@/.local/bin/nova-gravador

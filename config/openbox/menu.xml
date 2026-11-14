@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="NOVA OS">
+    <item label="Todos os apps"><action name="Execute"><command>@HOME@/.local/bin/nova-apps</command></action></item>
+    <item label="Mudar o papel de parede"><action name="Execute"><command>@HOME@/.local/bin/nova-ajustes --pagina 1</command></action></item>
+    <item label="Ajustes"><action name="Execute"><command>@HOME@/.local/bin/nova-ajustes</command></action></item>
+    <separator/>
+    <item label="Terminal"><action name="Execute"><command>xterm</command></action></item>
+    <item label="Monitor do sistema"><action name="Execute"><command>@HOME@/.local/bin/nova-otimizador --monitor</command></action></item>
+    <separator/>
+    <item label="Bloquear a tela"><action name="Execute"><command>dm-tool lock</command></action></item>
+    <item label="Sair da sessão"><action name="Exit"><prompt>yes</prompt></action></item>
+  </menu>
+</openbox_menu>

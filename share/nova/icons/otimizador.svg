@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfd"/><stop offset="1" stop-color="#dcdce2"/></linearGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur in="SourceAlpha" stdDeviation="3.5"/><feOffset dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g filter="url(#s)">
+    <rect x="12" y="10" width="104" height="104" rx="26" fill="url(#g)"/>
+    <rect x="12.75" y="10.75" width="102.5" height="102.5" rx="25.25" fill="none" stroke="url(#h)" stroke-width="1.5"/>
+  </g>
+  <circle cx="64" cy="62" r="27" fill="none" stroke="#dcdce2" stroke-width="9"/>
+  <path d="M64 35a27 27 0 0 1 25.4 36.2" fill="none" stroke="#0a84ff" stroke-width="9" stroke-linecap="round"/>
+  <path d="M67 48l-12 17h9l-3 13 12-17h-9z" fill="#3a3a3c"/>
+</svg>

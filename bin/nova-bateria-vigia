@@ -1,0 +1,21 @@
+#!/bin/sh
+# Avisos de bateria: fraca (20%), crítica (10%), suspende em 4%; avisa ao conectar/desconectar o carregador e ao carregar por completo.
+B=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1); [ -z "$B" ] && exit 0
+I="$HOME/.local/share/nova/barra"; last=""; w20=0; w10=0; full=0
+while :; do
+  p=$(cat "$B/capacity" 2>/dev/null || echo 100); s=$(cat "$B/status" 2>/dev/null)
+  case "$s" in Charging|Full|"Not charging") on=1;; *) on=0;; esac
+  if [ -n "$last" ] && [ "$on" != "$last" ]; then
+    if [ "$on" = 1 ]; then notify-send -t 4000 -i "$I/bat-50-c.png" -h string:x-dunst-stack-tag:bat "Carregando" "Carregador conectado. Bateria em $p%."; w20=0; w10=0
+    else notify-send -t 4000 -i "$I/bat-50.png" -h string:x-dunst-stack-tag:bat "Usando a bateria" "Carregador desconectado. Bateria em $p%."; full=0; fi
+  fi
+  last=$on
+  if [ "$on" = 0 ]; then
+    if [ "$p" -le 4 ]; then notify-send -u critical -i "$I/bat-0.png" -h string:x-dunst-stack-tag:bat "Bateria quase no fim" "O computador vai suspender para não perder o seu trabalho."; sleep 8; systemctl suspend 2>/dev/null || sudo -n /usr/local/sbin/nova-admin suspend
+    elif [ "$p" -le 10 ] && [ "$w10" = 0 ]; then notify-send -u critical -i "$I/bat-10.png" -h string:x-dunst-stack-tag:bat "Bateria muito fraca: $p%" "Conecte o carregador agora."; w10=1
+    elif [ "$p" -le 20 ] && [ "$w20" = 0 ]; then notify-send -t 8000 -i "$I/bat-20.png" -h string:x-dunst-stack-tag:bat "Bateria fraca: $p%" "Conecte o carregador quando puder."; w20=1; fi
+  elif [ "$s" = Full ] || [ "$p" -ge 100 ]; then
+    [ "$full" = 0 ] && notify-send -t 5000 -i "$I/bat-100-c.png" -h string:x-dunst-stack-tag:bat "Bateria carregada" "Já pode tirar o carregador da tomada, se quiser."; full=1
+  fi
+  sleep 30
+done

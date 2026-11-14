@@ -1,0 +1,27 @@
+#!/bin/sh
+# Proteção em tempo real: todo arquivo novo ou alterado de tipo arriscado nas pastas do usuário (Downloads, Documentos,
+# Área de Trabalho, Imagens, Vídeos, Música, pendrives, /tmp) é verificado com o ClamAV.
+# Arquivo infectado vai para a quarentena e gera um aviso. Desligar: nova-config antivirus 0
+D="$HOME/Downloads"; Q="$HOME/.local/share/nova/quarentena"; mkdir -p "$D" "$Q"
+command -v clamscan >/dev/null || exit 0
+W=""; for d in "$D" "$HOME/Documentos" "$HOME/Documents" "$HOME/Área de Trabalho" "$HOME/Área de trabalho" "$HOME/Desktop" "$HOME/Imagens" "$HOME/Pictures" "$HOME/Vídeos" "$HOME/Videos" "$HOME/Música" "$HOME/Músicas" "$HOME/Music" /tmp "/media/$USER" "/run/media/$USER"; do [ -d "$d" ] && W="$W
+$d"; done
+echo "$W" | tail -n +2 | tr '\n' '\0' | xargs -0 inotifywait -r -m -q -e close_write -e moved_to --format '%w%f' --exclude '/(\.cache|\.thumbnails|nova/quarentena)(/|$)' | while read -r p; do
+  f=$(basename "$p"); [ -f "$p" ] || continue
+  case "$p" in "$Q"/*) continue;; esac
+  case "$f" in *.part|*.crdownload|*.tmp|.*) continue;; esac
+  case "$(echo "$f" | tr 'A-Z' 'a-z')" in
+    *.exe|*.msi|*.bat|*.cmd|*.scr|*.com|*.vbs|*.js|*.jar|*.sh|*.deb|*.rpm|*.apk|*.appimage|*.run|*.zip|*.rar|*.7z|*.tar|*.gz|*.xz|*.iso|*.pdf|*.doc|*.docx|*.docm|*.xls|*.xlsx|*.xlsm|*.ppt|*.pptx|*.rtf|*.html|*.htm|*.lnk|*.ps1) ;;
+    *) continue;; esac
+  [ "$(stat -c %s "$p" 2>/dev/null || echo 0)" -gt 314572800 ] && continue      # acima de 300 MB: pula (pesaria demais)
+  sleep 1; [ -f "$p" ] || continue
+  out=$(nice -n 15 clamscan --no-summary --infected "$p" 2>/dev/null); rc=$?
+  if [ "$rc" = 1 ]; then
+    v=$(echo "$out" | sed -n 's/.*: \(.*\) FOUND/\1/p' | head -1); mv -f "$p" "$Q/$f.$(date +%s)" 2>/dev/null && chmod 000 "$Q/$f".* 2>/dev/null
+    notify-send -u critical -i /usr/share/icons/Papirus/48x48/status/dialog-warning.svg "Ameaça bloqueada" "O arquivo \"$f\" tinha um vírus ($v) e foi movido para a quarentena. Ele não pode mais ser aberto."
+    echo "$(date '+%F %T') INFECTADO $f ($v)" >> "$HOME/.local/share/nova/antivirus.log"
+  elif [ "$rc" = 0 ]; then
+    notify-send -t 3500 -i /usr/share/icons/Papirus/48x48/apps/security-high.svg "Download verificado" "\"$f\" não tem ameaças conhecidas."
+    echo "$(date '+%F %T') limpo $f" >> "$HOME/.local/share/nova/antivirus.log"
+  fi
+done

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Todos os apps
+Comment=Todos os aplicativos
+Exec=@HOME@/.local/bin/nova-apps
+Icon=@HOME@/.local/share/nova/icons/apps.png
+Terminal=false
+StartupWMClass=Nova-apps
+Categories=Utility;
+NoDisplay=true

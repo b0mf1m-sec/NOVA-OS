@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Otimizador
+Comment=Liberar memória e destravar o computador
+Exec=@HOME@/.local/bin/nova-otimizador
+Icon=@HOME@/.local/share/nova/icons/otimizador.png
+Terminal=false
+StartupWMClass=Nova-otimizador
+Categories=System;Utility;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=@HOME@/.local/bin/nova-otimizador

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Abrir ou instalar programa
+Exec=@HOME@/.local/bin/nova-abrir-programa %f
+Icon=system-software-install
+Terminal=false
+NoDisplay=true
+MimeType=application/vnd.appimage;application/x-iso9660-appimage;application/vnd.debian.binary-package;application/x-deb;application/x-ms-dos-executable;application/x-msdownload;application/x-msi;application/x-ms-shortcut;application/vnd.microsoft.portable-executable;

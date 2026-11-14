@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Arquivos
+Comment=Gerenciador de arquivos
+Exec=pcmanfm %U
+Icon=@HOME@/.local/share/nova/icons/arquivos.png
+Terminal=false
+StartupWMClass=Pcmanfm
+Categories=System;FileManager;
+MimeType=inode/directory;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=pcmanfm %U

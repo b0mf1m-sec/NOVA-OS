@@ -1,0 +1,20 @@
+#!/bin/sh
+# Ajusta volume/brilho e mostra um aviso visual (barra de nível) no canto da tela.
+I="$HOME/.local/share/nova/barra"
+case "$1" in
+  vol+) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+  vol-) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+  mudo) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+  bri+) brightnessctl -q set +5% ;;
+  bri-) brightnessctl -q set 5%- ;;
+  mic)  wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle; notify-send -t 1200 -h string:x-dunst-stack-tag:osd "Microfone" "Liga/desliga alternado"; exit 0 ;;
+esac
+case "$1" in
+  vol*|mudo)
+    v=$(LC_ALL=C wpctl get-volume @DEFAULT_AUDIO_SINK@); p=$(echo "$v" | awk '{printf "%d", $2*100+0.5}')
+    case "$v" in *MUTED*) notify-send -t 1200 -i "$I/vol-mudo.png" -h string:x-dunst-stack-tag:osd -h int:value:0 "Som" "Sem som" ;;
+      *) notify-send -t 1200 -i "$I/vol-alto.png" -h string:x-dunst-stack-tag:osd -h int:value:"$p" "Som" "$p%" ;; esac ;;
+  bri*)
+    b=$(ls -d /sys/class/backlight/* | head -1); p=$(( $(cat "$b/brightness") * 100 / $(cat "$b/max_brightness") ))
+    notify-send -t 1200 -h string:x-dunst-stack-tag:osd -h int:value:"$p" "Brilho" "$p%" ;;
+esac

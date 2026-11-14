@@ -1,0 +1,11 @@
+#!/bin/sh
+# NOVA OS: pergunta antes de reiniciar/desligar (botões da barra).
+case "$1" in
+  reiniciar) T="Reiniciar o computador?"; B="Reiniciar"; C="systemctl reboot" ;;
+  desligar)  T="Desligar o computador?";  B="Desligar";  C="systemctl poweroff" ;;
+  *) exit 1 ;;
+esac
+pgrep -f "zenity --question --title=NOVA OS" >/dev/null 2>&1 && exit 0
+zenity --question --title="NOVA OS" --icon=system-shutdown --width=380 \
+  --text="<span size='large' weight='bold'>$T</span>\n\nSalve o que estiver fazendo antes de continuar." \
+  --ok-label="$B" --cancel-label="Cancelar" 2>/dev/null && exec $C

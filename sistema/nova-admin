@@ -1,0 +1,51 @@
+#!/bin/bash
+# Único comando que o NOVA OS pode rodar como administrador sem pedir senha.
+# Cada ação é fixa e os argumentos são validados; qualquer outra coisa exige a senha.
+set -u
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL=C
+U="${SUDO_USER:-}"; v="${1:-}"; shift || true
+pk() { # valida nomes de pacote: só letras minúsculas, números e + . - ; sem caminhos nem opções
+  [ $# -gt 0 ] && [ $# -le 20 ] || exit 2
+  for p in "$@"; do [[ "$p" =~ ^[a-z0-9][a-z0-9+.-]{0,80}$ ]] || exit 2; done
+}
+case "$v" in
+  ufw-on) ufw --force enable ;;
+  ufw-off) ufw disable ;;
+  ufw-status) ufw status ;;
+  bt-on) systemctl enable --now bluetooth ;;
+  bt-off) systemctl disable --now bluetooth ;;
+  bt-start) systemctl start bluetooth ;;
+  bt-stop) systemctl stop bluetooth ;;
+  suspend|reboot|poweroff) systemctl "$v" ;;
+  ssh-on)  ufw limit from 192.168.0.0/16 to any port 22 proto tcp >/dev/null; systemctl enable --now ssh ;;
+  ssh-off) systemctl disable --now ssh ssh.socket 2>/dev/null; ufw delete limit from 192.168.0.0/16 to any port 22 proto tcp >/dev/null 2>&1; true ;;
+  autologin-on)
+    [[ "$U" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && id "$U" >/dev/null 2>&1 || exit 2
+    f=/etc/lightdm/lightdm.conf.d/50-nova.conf
+    sed -i '/^autologin-/d' $f; printf 'autologin-user=%s\nautologin-user-timeout=0\n' "$U" >> $f ;;
+  autologin-off) sed -i '/^autologin-/d' /etc/lightdm/lightdm.conf.d/50-nova.conf ;;
+  apt-update) apt-get update -qq ;;
+  apt-install) pk "$@"
+    for p in "$@"; do case " aisleriot audacity bleachbit blueman chromium chromium-l10n cups firefox-esr firefox-esr-l10n-pt-br flameshot galculator gimp htop inkscape kdenlive keepassxc krita libreoffice-calc libreoffice-gtk3 libreoffice-impress libreoffice-l10n-pt-br libreoffice-writer luanti mousepad obs-studio p7zip-full qbittorrent ristretto supertuxkart system-config-printer thunderbird thunderbird-l10n-pt-br unzip vlc wine xarchiver " in
+      *" $p "*) ;; *) echo "pacote fora da lista da Loja: $p" >&2; exit 2 ;; esac; done
+    for p in "$@"; do apt-cache policy "$p" | grep -q 'Candidate: [^(]' || { echo "pacote indisponivel: $p" >&2; exit 2; }; done
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o APT::Status-Fd=1 "$@" ;;
+  apt-remove) pk "$@"
+    for p in "$@"; do case "$p" in # nunca remover peças do sistema, mesmo sem senha
+      sudo|apt|dpkg|libc*|systemd*|lightdm*|openbox|plank|picom|xorg*|xserver*|network-manager*|nova-*|bash|coreutils|login|util-linux|grub*|linux-image*|firefox-esr|ufw|clamav*) echo "pacote protegido: $p" >&2; exit 2 ;; esac; done
+    DEBIAN_FRONTEND=noninteractive apt-get remove -y -o APT::Status-Fd=1 "$@" ;;
+  apt-autoremove) apt-get autoremove -y ;;
+  apt-clean) apt-get clean ;;
+  flatpak-remove) pk "$@"; [ $# -eq 1 ] || exit 2; flatpak uninstall -y --noninteractive "$1" ;;
+  journal-vacuum) journalctl --vacuum-size=40M ;;
+  swap-reset) swapoff -a && swapon -a ;;
+  drop-caches) sync; echo 3 > /proc/sys/vm/drop_caches; echo 1 > /proc/sys/vm/compact_memory ;;
+  install-nova) # copia um arquivo do usuário para /usr/share/nova, só com nomes permitidos
+    src="${1:-}"; name="${2:-}"
+    case "$name" in login-bg.png|login-blur.png|paleta.css) ;; *) exit 2 ;; esac
+    [ -f "$src" ] && [ ! -L "$src" ] || exit 2
+    r=$(realpath "$src"); case "$r" in /home/*|/usr/share/nova/*) ;; *) exit 2 ;; esac
+    install -m644 -o root -g root "$src" "/usr/share/nova/$name" ;;
+  *) echo "ação não permitida" >&2; exit 2 ;;
+esac

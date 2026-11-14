@@ -1,0 +1,11 @@
+[docks/dock1]
+dock-items=['nova-apps.dockitem', 'nova-navegador.dockitem', 'nova-arquivos.dockitem', 'nova-whatsapp.dockitem', 'nova-loja.dockitem', 'nova-ajustes.dockitem', 'nova-otimizador.dockitem']
+hide-delay=250
+hide-mode='dodge-maximized'
+icon-size=48
+position='bottom'
+pressure-reveal=false
+theme='Nova'
+unhide-delay=0
+zoom-enabled=false
+zoom-percent=150

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=WhatsApp
+Comment=Conversas do WhatsApp
+Exec=@HOME@/.local/bin/nova-whatsapp
+Icon=@HOME@/.local/share/nova/icons/whatsapp.png
+Terminal=false
+StartupWMClass=Nova-whatsapp
+Categories=Network;InstantMessaging;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=@HOME@/.local/bin/nova-whatsapp

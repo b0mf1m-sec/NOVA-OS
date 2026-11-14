@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Leitor de PDF
+Comment=Ler documentos PDF (Zathura)
+Exec=zathura %f
+Icon=@HOME@/.local/share/nova/icons/pdf.png
+Terminal=false
+StartupWMClass=Zathura
+Categories=Office;Viewer;
+MimeType=application/pdf;
+
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Abrir nova janela
+Exec=zathura %f

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=NOVA OS
+Comment=Área de trabalho NOVA OS (Openbox, barra e dock)
+Exec=/usr/local/bin/nova-session
+Type=Application
+DesktopNames=Openbox

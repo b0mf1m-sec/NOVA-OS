@@ -1,0 +1,7 @@
+# Iniciado pelo openbox-session (o ícone de Wi-Fi, nm-applet, sobe sozinho pelo autostart do sistema)
+"$HOME/.local/bin/nova-picom" &
+# a barra e a dock sobem depois do compositor, para já nascerem translúcidas
+(sleep 2; tint2) &
+(sleep 3; plank) &
+"$HOME/.local/bin/nova-sessao" &
+"$HOME/.local/bin/nova-icones" &

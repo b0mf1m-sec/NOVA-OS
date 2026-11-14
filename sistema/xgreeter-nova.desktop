@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=NOVA OS
+Exec=/usr/local/bin/nova-greeter
+Type=Application
+X-Ubuntu-Gettext-Domain=lightdm
