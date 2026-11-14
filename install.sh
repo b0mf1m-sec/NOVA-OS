@@ -62,6 +62,7 @@ if [ $SO_USUARIO -eq 0 ]; then
   sudo ufw default deny incoming >/dev/null; sudo ufw default allow outgoing >/dev/null; sudo ufw --force enable >/dev/null
   sudo systemctl enable --now clamav-freshclam unattended-upgrades 2>/dev/null || true
   sudo systemctl enable lightdm 2>/dev/null || true
+  sudo systemctl set-default graphical.target 2>/dev/null || true
 fi
 echo
 echo "Pronto! Reinicie o computador e escolha a sessão \"NOVA OS\" na tela de login."

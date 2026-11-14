@@ -47,6 +47,7 @@ Base: Openbox + tint2 + Plank + picom.
 
 - **Computador:** qualquer PC de 64 bits com **2 GB de RAM ou mais** (testado com 4 GB e processador Celeron antigo). Quanto menos memória, mais vale ligar o **Modo desempenho**.
 - **Sistema:** **Debian 13 "Trixie"** (64 bits), com internet.
+- **Espaço e tempo:** cerca de **6 GB livres** no disco. A instalação baixa mais de mil pacotes e compila os apps: leva de **20 a 40 minutos**, conforme a internet e o processador.
 - **Tela:** funciona de 1366x768 para cima.
 
 ## Instalação passo a passo
@@ -86,6 +87,8 @@ O instalador:
 2. copia as configurações e os comandos para a sua conta (guarda as suas configurações antigas em `~/.config/nova-backup-DATA`);
 3. **compila** os apps do NOVA OS (cerca de 2 a 5 minutos num computador fraco);
 4. configura a tela de login, o firewall, as atualizações automáticas e o antivírus.
+
+> **Atenção:** o instalador liga o firewall, que **bloqueia conexões que chegam** ao computador (inclusive SSH). Se você instalou por acesso remoto, a conexão deixa de responder no final; isso é esperado. Para liberar depois: Ajustes → Segurança → Acesso remoto.
 
 ### 4. Reinicie e entre
 
@@ -150,6 +153,12 @@ uninstall.sh desinstalador
 ## Segurança: como o `sudo` funciona
 
 O NOVA OS **não** libera `sudo` sem senha. Só `/usr/local/sbin/nova-admin` roda sem senha, com ações fixas (instalar/remover pacotes da lista da Loja, ligar/desligar firewall, etc.), validando cada argumento. Pacotes essenciais do sistema não podem ser removidos por ele. Qualquer outra coisa pede a senha.
+
+## Como foi testado
+
+- Notebook real (Debian 13, Celeron B830, 4 GB): uso diário.
+- Máquina virtual com a imagem oficial *Debian 13 genericcloud*: `git clone` + `./install.sh` completo até o fim, sem erros. Conferido: sudo restrito válido, firewall ativo, ajuste do kernel, serviços ligados (LightDM, antivírus, atualizações), `nova-admin` recusando pacotes fora da lista.
+- **Não verificado em VM:** a tela de login aparecendo após reiniciar (a imagem *cloud* não tem driver de vídeo). A tela de login foi testada no notebook real e em modo de demonstração.
 
 ## Aviso
 
