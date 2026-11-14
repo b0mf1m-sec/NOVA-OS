@@ -12,7 +12,7 @@ grep -q '^VERSION_ID="13"' /etc/os-release 2>/dev/null || echo "Aviso: o NOVA OS
 DEPS="openbox tint2 plank picom lightdm lightdm-gtk-greeter dunst feh pcmanfm xterm mpv zathura zathura-pdf-poppler clamav clamav-freshclam
  flameshot network-manager network-manager-gnome ufw unattended-upgrades flatpak fonts-inter fonts-jetbrains-mono papirus-icon-theme
  imagemagick inotify-tools xdotool xss-lock xcape udiskie xclip brightnessctl pipewire pipewire-pulse wireplumber libnotify-bin zenity
- dconf-cli xinput x11-utils x11-xserver-utils xinit xorg mousepad blueman sudo
+ dconf-cli xinput x11-utils x11-xserver-utils xinit xorg mousepad blueman sudo diodon librsvg2-bin python3
  build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev liblightdm-gobject-dev libpulse-dev libxcomposite-dev libx11-dev"
 if [ $SEM_DEP -eq 0 ]; then
   echo "==> Instalando pacotes (pede a senha)"; sudo apt-get update; sudo apt-get install -y $DEPS

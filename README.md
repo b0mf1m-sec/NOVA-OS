@@ -43,9 +43,36 @@ Um sistema **leve, bonito e fácil de usar** montado sobre o **Debian 13**, pens
 
 Base: Openbox + tint2 + Plank + picom.
 
-## Instalação
+## Requisitos
 
-Requisitos: **Debian 13 (Trixie)** já instalado (de preferência instalação mínima, sem ambiente gráfico), com internet.
+- **Computador:** qualquer PC de 64 bits com **2 GB de RAM ou mais** (testado com 4 GB e processador Celeron antigo). Quanto menos memória, mais vale ligar o **Modo desempenho**.
+- **Sistema:** **Debian 13 "Trixie"** (64 bits), com internet.
+- **Tela:** funciona de 1366x768 para cima.
+
+## Instalação passo a passo
+
+> Nunca usou Linux? Siga na ordem. Cada passo diz o que digitar.
+
+### 1. Instale o Debian 13
+
+1. Baixe o instalador em <https://www.debian.org/distrib/netinst> (arquivo "netinst" de 64 bits) e grave num pendrive (programas como Balena Etcher ou Rufus fazem isso).
+2. Inicie o computador pelo pendrive e siga o instalador. Na escolha dos programas (**"Seleção de programas"**), **desmarque** os ambientes gráficos (GNOME, KDE etc.) e deixe marcado apenas **"utilitários padrão do sistema"**. O NOVA OS traz o ambiente gráfico dele.
+3. Ao terminar, reinicie e entre com o seu usuário e senha na tela preta de texto.
+
+### 2. Dê permissão de administrador ao seu usuário (uma vez só)
+
+No Debian, o seu usuário ainda não pode usar `sudo`. Digite (troque `SEUUSUARIO` pelo nome que você criou):
+
+```bash
+su -
+apt install sudo
+usermod -aG sudo SEUUSUARIO
+exit
+```
+
+Depois **saia e entre de novo** (digite `exit` e faça login outra vez) para a permissão valer.
+
+### 3. Baixe e instale o NOVA OS
 
 ```bash
 sudo apt install git
@@ -54,14 +81,59 @@ cd NOVA-OS
 ./install.sh
 ```
 
-Rode como usuário comum; o instalador pede a senha quando precisar. Depois **reinicie** e, na tela de login, escolha a sessão **NOVA OS**.
+O instalador:
+1. instala os programas necessários (pede a sua senha, leva alguns minutos e usa a internet);
+2. copia as configurações e os comandos para a sua conta (guarda as suas configurações antigas em `~/.config/nova-backup-DATA`);
+3. **compila** os apps do NOVA OS (cerca de 2 a 5 minutos num computador fraco);
+4. configura a tela de login, o firewall, as atualizações automáticas e o antivírus.
 
-Opções:
+### 4. Reinicie e entre
 
-- `./install.sh --so-usuario` instala só a parte da sua conta (sem tela de login, firewall e ajustes de sistema).
-- `./install.sh --sem-dependencias` pula a instalação de pacotes.
+```bash
+sudo reboot
+```
 
-Suas configurações anteriores (openbox, tint2 etc.) são guardadas em `~/.config/nova-backup-DATA`.
+Na tela de login, digite a senha e, se aparecer um seletor de sessão, escolha **NOVA OS**.
+
+### 5. Primeiros passos
+
+- Clique em **Apps** (canto superior esquerdo) para ver todos os programas.
+- Abra a **Loja** (no dock) para instalar navegadores, VLC, LibreOffice, jogos e mais.
+- Abra **Ajustes** para escolher tema claro/escuro, cor, papel de parede e segurança.
+- Atalhos úteis: **Alt+Tab** troca de janela; passe o mouse num ícone do dock para ver as janelas abertas daquele programa.
+
+### Opções do instalador
+
+- `./install.sh --so-usuario` instala só a parte da sua conta, sem tela de login, firewall e ajustes de sistema. Bom para **testar sem mudar o computador todo**: depois, numa sessão de texto, rode `startx`.
+- `./install.sh --sem-dependencias` pula a instalação de pacotes (use se já tiver tudo).
+
+### Atualizar
+
+```bash
+cd NOVA-OS
+git pull
+./install.sh --sem-dependencias
+```
+
+### Desinstalar
+
+```bash
+cd NOVA-OS
+./uninstall.sh
+```
+
+Seus arquivos pessoais não são apagados.
+
+## Problemas comuns
+
+| Sintoma | O que fazer |
+|---|---|
+| A tela de login volta ao digitar a senha | Na tela de login, escolha outra sessão (ex.: Openbox) e veja o erro: `cat ~/.xsession-errors` |
+| Aparece a tela de login padrão, não a do NOVA OS | Rode `sudo journalctl -u lightdm -b` e confira se `/usr/local/bin/nova-greeter-bin` existe. Se o login próprio falha, o sistema usa o login comum de propósito. |
+| Sem Wi-Fi | Instale o firmware da sua placa: `sudo apt install firmware-iwlwifi` (Intel) ou `firmware-realtek`, `firmware-atheros` (precisa ativar o repositório `non-free-firmware` do Debian) |
+| Sem som | Abra o controle de volume pelo ícone da barra; confira em **Ajustes → Tela e som** |
+| Computador lento | Ative o **Modo desempenho** no Otimizador |
+| A Loja pede senha | É normal quando o ajudante sem senha não está instalado; digite a senha do computador |
 
 ## Estrutura do repositório
 
@@ -71,7 +143,8 @@ bin/       comandos nova-* (shell)
 config/    configurações (openbox, tint2, picom, plank, dunst...)
 share/     ícones, papéis de parede, temas, lançadores
 sistema/   o que vai para fora da sua pasta (login, sudo restrito, sysctl, políticas do Firefox)
-install.sh instalador
+install.sh   instalador
+uninstall.sh desinstalador
 ```
 
 ## Segurança: como o `sudo` funciona
