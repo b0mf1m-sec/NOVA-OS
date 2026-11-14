@@ -4,6 +4,14 @@ Um sistema **leve, bonito e fácil de usar** montado sobre o **Debian 13**, pens
 
 ![Loja do NOVA OS](docs/loja.png)
 
+## Capturas de tela
+
+| | |
+|---|---|
+| **Alt+Tab com miniaturas** ![Alt+Tab](docs/alttab.png) | **Pré-visualização ao passar o mouse no dock** ![Dock](docs/dock-previa.png) |
+| **Todos os apps** ![Apps](docs/apps.png) | **Tela de login** ![Login](docs/login.jpg) |
+| **Ajustes** ![Ajustes](docs/ajustes.png) | **Otimizador e Modo desempenho** ![Otimizador](docs/otimizador.png) |
+
 ## Vantagens
 
 - **Roda em máquina fraca.** Desenvolvido e usado num notebook com Celeron B830, 4 GB de RAM e tela 1366x768. Os apps são escritos em C (GTK3), sem Electron nem navegador embutido (exceto o WhatsApp), e há um **Modo desempenho** de um clique.
