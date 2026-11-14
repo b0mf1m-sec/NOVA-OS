@@ -109,6 +109,7 @@ Na tela de login, digite a senha e, se aparecer um seletor de sessão, escolha *
 
 - `./install.sh --so-usuario` instala só a parte da sua conta, sem tela de login, firewall e ajustes de sistema. Bom para **testar sem mudar o computador todo**: depois, numa sessão de texto, rode `startx`.
 - `./install.sh --sem-dependencias` pula a instalação de pacotes (use se já tiver tudo).
+- `./install.sh --boot` **(opcional)** instala também a tela de boot NOVA OS (logo animado ao ligar, desligar e reiniciar). Ela altera o GRUB (menu escondido; aperte `Esc` ao ligar para vê-lo) e o initramfs. Para voltar ao normal: `sudo bash boot/desinstalar.sh`.
 
 ### Atualizar
 
@@ -145,6 +146,7 @@ fontes/    código dos apps (C/GTK3) e script de compilação
 bin/       comandos nova-* (shell)
 config/    configurações (openbox, tint2, picom, plank, dunst...)
 share/     ícones, papéis de parede, temas, lançadores
+boot/      tela de boot opcional (Plymouth), instalador e desinstalador
 sistema/   o que vai para fora da sua pasta (login, sudo restrito, sysctl, políticas do Firefox)
 install.sh   instalador
 uninstall.sh desinstalador

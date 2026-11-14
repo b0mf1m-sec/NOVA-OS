@@ -1,0 +1,111 @@
+# Tema NOVA OS: horizonte com fio de luz, "N" que respira. Ao desligar: "Até logo".
+W = Window.GetWidth(); H = Window.GetHeight();
+k = H / 768;                         # escala em relação ao desenho base (1366x768)
+Window.SetBackgroundTopColor(0.016, 0.018, 0.030);
+Window.SetBackgroundBottomColor(0.030, 0.036, 0.062);
+
+mode = Plymouth.GetMode();
+saindo = (mode == "shutdown" || mode == "reboot");
+
+# fundo (cobre a tela toda sem distorcer)
+img = Image("fundo.png");
+sc = Math.Max(W / img.GetWidth(), H / img.GetHeight());
+fundo.img = img.Scale(img.GetWidth() * sc, img.GetHeight() * sc);
+fundo.sp = Sprite(fundo.img);
+fundo.sp.SetPosition((W - fundo.img.GetWidth()) / 2, (H - fundo.img.GetHeight()) / 2, -100);
+
+# brilho do horizonte (respira)
+b = Image("brilho.png");
+ks = W / 1366;
+brilho.img = b.Scale(W, 700 * ks);
+brilho.sp = Sprite(brilho.img);
+brilho.sp.SetPosition(0, H * 0.83 - 600 * ks, -50);
+brilho.sp.SetOpacity(0);
+
+fun centro(sprite, imagem, y) {
+    sprite.SetPosition((W - imagem.GetWidth()) / 2, y, 10);
+}
+
+# logo N
+l = Image("logo.png");
+logo.img = l.Scale(l.GetWidth() * k, l.GetHeight() * k);
+logo.sp = Sprite(logo.img);
+if (saindo) logo.y = H * 0.15; else logo.y = H * 0.19;
+centro(logo.sp, logo.img, logo.y);
+logo.sp.SetOpacity(0);
+
+# textos
+if (saindo) {
+    t1 = Image("ate-logo.png");
+    if (mode == "reboot") t2 = Image("sub-reinicia.png"); else t2 = Image("sub-desliga.png");
+} else {
+    t1 = Image("nome.png");
+    t2 = Image("sub-inicia.png");
+}
+titulo.img = t1.Scale(t1.GetWidth() * k, t1.GetHeight() * k);
+titulo.sp = Sprite(titulo.img);
+titulo.y = logo.y + logo.img.GetHeight() * 0.88;
+if (saindo) titulo.y = (H - titulo.img.GetHeight()) / 2;
+centro(titulo.sp, titulo.img, titulo.y);
+titulo.sp.SetOpacity(0);
+
+sub.img = t2.Scale(t2.GetWidth() * k, t2.GetHeight() * k);
+sub.sp = Sprite(sub.img);
+centro(sub.sp, sub.img, titulo.y + titulo.img.GetHeight() * 1.0);
+sub.sp.SetOpacity(0);
+
+# barra de progresso (só na inicialização)
+tr = Image("trilho.png"); br = Image("barra.png");
+barra.w = tr.GetWidth() * k; barra.h = tr.GetHeight() * k; barra.x = (W - barra.w) / 2;
+barra.y = sub.sp.GetY() + sub.img.GetHeight() + 28 * k;
+trilho.sp = Sprite(tr.Scale(barra.w, barra.h));
+trilho.sp.SetPosition(barra.x, barra.y, 10);
+trilho.sp.SetOpacity(0);
+barra.sp = Sprite();
+barra.sp.SetPosition(barra.x, barra.y, 11);
+barra.alvo = 0; barra.atual = 0; barra.ult = 0;
+
+fun progresso(tempo, prog) { barra.alvo = prog; }
+Plymouth.SetBootProgressFunction(progresso);
+
+fun suave(x) { if (x < 0) return 0; if (x > 1) return 1; return x * x * (3 - 2 * x); }
+
+frame = 0;
+fun atualiza() {
+    frame++;
+    t = frame / 50;                                  # ~segundos
+    if (saindo) {                                    # tela de saída: estática, sem animação
+        brilho.sp.SetOpacity(0.7);
+        titulo.sp.SetOpacity(1);
+        sub.sp.SetOpacity(0.9);
+        return;
+    }
+    resp = 0.5 + 0.5 * Math.Sin(t * 2.2 - 1.5);      # respiração 0..1
+    if (!saindo) logo.sp.SetOpacity(suave(t / 1.4) * (0.82 + 0.18 * resp));
+    brilho.sp.SetOpacity(suave(t / 2.0) * (0.55 + 0.45 * resp));
+    titulo.sp.SetOpacity(suave((t - 0.3) / 0.9));
+    if (!saindo) sub.sp.SetOpacity(suave((t - 1.1) / 1.2) * 0.9);
+    if (!saindo) {
+        trilho.sp.SetOpacity(suave((t - 1.4) / 1.0));
+        # progresso real, mas nunca para: avança um pouquinho sozinho
+        barra.atual = barra.atual + (barra.alvo - barra.atual) * 0.04;
+        fake = 1 - 1 / (1 + t * 0.12);
+        v = Math.Max(barra.atual, fake * 0.9);
+        if (v > 1) v = 1;
+        w = Math.Int(barra.w * v);
+        if (w < 4) w = 4;
+        if (w != barra.ult) { barra.sp.SetImage(br.Scale(w, barra.h)); barra.ult = w; }
+        barra.sp.SetOpacity(suave((t - 1.4) / 1.0));
+    }
+}
+Plymouth.SetRefreshFunction(atualiza);
+
+# mensagens de texto do sistema (erros, discos): discretas, na parte de baixo
+msg.sp = Sprite();
+fun mensagem(texto) {
+    im = Image.Text(texto, 0.75, 0.80, 0.95, 1, "Inter 11");
+    msg.sp.SetImage(im);
+    msg.sp.SetPosition((W - im.GetWidth()) / 2, H * 0.93, 20);
+}
+Plymouth.SetDisplayMessageFunction(mensagem);
+Plymouth.SetHideMessageFunction(fun(t) { msg.sp.SetOpacity(0); });

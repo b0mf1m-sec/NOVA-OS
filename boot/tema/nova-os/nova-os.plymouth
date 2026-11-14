@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=NOVA OS
+Description=Tela de inicialização e desligamento do NOVA OS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/nova-os
+ScriptFile=/usr/share/plymouth/themes/nova-os/nova-os.script

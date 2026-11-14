@@ -2,10 +2,11 @@
 # Instalador do NOVA OS (Debian 13 "Trixie"). Rode como usuário comum, NÃO como root:  ./install.sh
 #   --so-usuario       instala só a parte do usuário (sem login, firewall e ajustes de sistema)
 #   --sem-dependencias não instala pacotes (use se já tiver tudo)
+#   --boot             também instala a tela de boot NOVA OS (opcional; mexe no GRUB)
 set -e
 AQUI=$(cd "$(dirname "$0")" && pwd); U=$(id -un)
-SO_USUARIO=0; SEM_DEP=0
-for a in "$@"; do case $a in --so-usuario) SO_USUARIO=1;; --sem-dependencias) SEM_DEP=1;; *) echo "opção desconhecida: $a"; exit 2;; esac; done
+SO_USUARIO=0; SEM_DEP=0; BOOT=0
+for a in "$@"; do case $a in --so-usuario) SO_USUARIO=1;; --sem-dependencias) SEM_DEP=1;; --boot) BOOT=1;; *) echo "opção desconhecida: $a"; exit 2;; esac; done
 [ "$(id -u)" -ne 0 ] || { echo "Rode como usuário comum (o instalador pede a senha só quando precisar)."; exit 1; }
 grep -q '^VERSION_ID="13"' /etc/os-release 2>/dev/null || echo "Aviso: o NOVA OS foi feito para Debian 13; em outra versão pode não funcionar."
 
@@ -63,7 +64,9 @@ if [ $SO_USUARIO -eq 0 ]; then
   sudo systemctl enable --now clamav-freshclam unattended-upgrades 2>/dev/null || true
   sudo systemctl enable lightdm 2>/dev/null || true
   sudo systemctl set-default graphical.target 2>/dev/null || true
+  if [ $BOOT -eq 1 ]; then echo "==> Tela de boot NOVA OS"; sudo bash "$AQUI/boot/instalar.sh"; fi
 fi
+[ $BOOT -eq 1 ] && [ $SO_USUARIO -eq 1 ] && echo "Aviso: --boot é ignorado com --so-usuario (mexe no sistema)." || true
 echo
 echo "Pronto! Reinicie o computador e escolha a sessão \"NOVA OS\" na tela de login."
 [ -d "$BK" ] && echo "Suas configurações antigas ficaram guardadas em: $BK" || true
