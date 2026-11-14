@@ -1,0 +1,7 @@
+// NOVA OS: os botões Desligar/Reiniciar/Suspender da tela de login funcionam.
+polkit.addRule(function(action, subject) {
+    if (subject.user == "lightdm" &&
+        /^org\.freedesktop\.login1\.(power-off|reboot|suspend|hibernate)(-multiple-sessions|-ignore-inhibit)?$/.test(action.id)) {
+        return polkit.Result.YES;
+    }
+});

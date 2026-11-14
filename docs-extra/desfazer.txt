@@ -1,0 +1,75 @@
+sudo systemctl enable --now bluetooth.service
+sudo systemctl enable networking.service
+sudo systemctl enable NetworkManager-wait-online.service
+sudo systemctl enable --now anacron.service anacron.timer
+sudo systemctl enable --now e2scrub_reap.service e2scrub_all.timer man-db.timer dpkg-db-backup.timer
+sudo apt-get install volumeicon-alsa
+# Pedido 6 (gravador): remover: rm ~/.local/bin/nova-gravador ~/.local/share/applications/nova-gravador.desktop ~/.config/plank/dock1/launchers/nova-gravador.dockitem; tirar 'nova-gravador.dockitem' do dconf dock-items
+# Login (LightDM): remover: sudo systemctl disable lightdm; sudo rm /etc/lightdm/lightdm.conf.d/50-nova.conf (volta ao startx)
+# Login próprio (nova-greeter): voltar ao greeter padrão: sudo sed -i 's/^greeter-session=.*/greeter-session=lightdm-gtk-greeter/' /etc/lightdm/lightdm.conf.d/50-nova.conf
+# Loja: remover: rm ~/.local/bin/nova-loja ~/.local/share/applications/nova-loja.desktop ~/.config/plank/dock1/launchers/nova-loja.dockitem
+# Animações/vidro da área de trabalho: desligar o vidro: touch ~/.config/picom/sem-vidro ; desfazer animações: cp ~/.config/picom/picom.conf.bak-pre-anim ~/.config/picom/picom.conf
+# Otimizador: remover: rm ~/.local/bin/nova-otimizador ~/.local/share/applications/nova-otimizador.desktop ~/.config/plank/dock1/launchers/nova-otimizador.dockitem
+
+=== Visual estilo macOS e apps novos (2026-11-14) ===
+# Tema: tudo é gerado por ~/.local/bin/nova-tema (tema claro|escuro, destaque COR, papel NOME, dock N). Fontes dos apps: ~/nova-*/ ; base comum: ~/nova-comum/nova.h
+# Voltar ao visual carmesim antigo: os fontes antigos estão em *.bak-carmesim; ícones em ~/.local/share/nova/icons-carmesim; rc.xml em ~/.config/openbox/rc.xml.bak-pre-mac
+# Desligar o vidro fosco (perfil glx do compositor): touch ~/.config/picom/sem-vidro   (ou Ajustes > Aparência)
+# Serviços da sessão: ~/.local/bin/nova-sessao (linha no fim de ~/.config/openbox/autostart). Opções: ~/.config/nova/opcoes
+# Antivírus dos downloads: desligar: nova-config antivirus 0 (ou Ajustes > Segurança). Remover: sudo apt remove clamav clamav-freshclam
+# Firewall: sudo ufw disable     # Navegador (bloqueador + HTTPS): sudo rm /usr/lib/firefox-esr/distribution/policies.json
+# Bluetooth: fica desligado; liga pela Central de controle ou Ajustes
+# Pacotes desta etapa: dunst libnotify-bin udiskie flameshot inotify-tools blueman libfuse2t64 xsettingsd libwebkit2gtk-4.1-dev clamav clamav-freshclam xinput ufw
+
+== Atalhos estilo Windows (2026-11-14) ==
+Pacotes: xcape, diodon, xclip (sudo apt purge xcape diodon xclip).
+Atalhos em ~/.config/openbox/rc.xml (backup anterior: rc.xml.bak-atalhos).
+Linhas do diodon e do xcape em ~/.local/bin/nova-sessao (apagar para desligar).
+
+== NOVA OS: nome, login e botões de energia (2026-11-14) ==
+Login antigo: ~/nova-greeter/greeter.c.bak-nova (compilar e copiar para /usr/local/bin/nova-greeter-bin).
+Botões Reiniciar/Desligar na barra: em ~/.local/bin/nova-tema voltar panel_items para PFSEEPC e rodar nova-tema.
+Confirmação: ~/.local/bin/nova-energia.
+
+== Troca de nome para NOVA OS + login minimalista + modo desempenho + dock (2026-11-14) ==
+Nome: todos os arquivos, pastas e comandos agora usam "nova-*" (pastas ~/nova-*, comandos ~/.local/bin/nova-*, ~/.config/nova, ~/.local/share/nova, /usr/share/nova, sessão e login em /usr/local/bin/nova-*).
+  Cópia de antes da troca: ~/copia-antes-da-troca-de-nome.tgz (pode apagar quando tudo estiver confirmado).
+Compilar os apps: ~/nova-comum/compilar [app]   (greeter: depois sudo install -m755 ~/nova-greeter/nova-greeter /usr/local/bin/nova-greeter-bin)
+Login anterior (nebulosa): ~/nova-greeter/greeter.c.bak-login2 (compilar e instalar como acima).
+Modo desempenho: nova-desempenho on|off (chave no Otimizador). Perfil do compositor: ~/.config/picom/picom-leve.conf.
+Dock escondendo com janela maximizada: voltar: dconf write /net/launchpad/plank/docks/dock1/hide-mode "'none'"
+Navegador abrindo maximizado: apagar a linha class="firefox-esr" em ~/.config/openbox/rc.xml (backup: rc.xml.bak-navegador).
+Cabeçalho compacto do navegador: sudo cp /usr/lib/firefox-esr/distribution/policies.json.bak-cabecalho /usr/lib/firefox-esr/distribution/policies.json
+Clique direito nos Apps (administrador/desinstalar): ~/.local/bin/nova-programa; fonte em ~/nova-apps/apps.c.
+
+== Vídeo e popups (2026-11-14) ==
+Vídeo: pacotes i965-va-driver vainfo (sudo apt purge ...). Firefox: prefs de vídeo em policies.json (VP9/AV1 desligados, VA-API ligado); voltar: sudo cp /usr/lib/firefox-esr/distribution/policies.json.bak-video /usr/lib/firefox-esr/distribution/policies.json
+Popups centralizados: ~/.local/bin/nova-centraliza (linha em nova-sessao; regras type=dialog em rc.xml, backup rc.xml.bak-popups).
+Varredura pausa em tela cheia: ~/.local/bin/nova-pausa-varredura (linha em nova-sessao).
+
+== Aba Atalhos e navegador escolhível (2026-11-14) ==
+Ajustes: páginas "Aplicativos" e "Atalhos" (fonte ~/nova-ajustes/ajustes.c; antes: ajustes.c.bak-atalhos). Lista de atalhos é texto fixo na função page_atalhos: ao mudar atalho em ~/.config/openbox/rc.xml, atualizar lá também.
+Navegador do dock: ~/.local/bin/nova-navegador lê a opção 'navegador' (nova-config navegador X.desktop). nova-navegador.desktop agora executa esse script.
+
+== Segurança reforçada (2026-11-14) ==
+Sudo: antes o usuário tinha 'NOPASSWD: ALL'. Agora só o ajudante /usr/local/sbin/nova-admin roda sem senha (ações fixas e validadas; apps do NOVA chamam 'sudo -n /usr/local/sbin/nova-admin AÇÃO'). Todo o resto pede a senha.
+  Voltar ao antigo (não recomendado): sudo mv /root/90-billones-nopasswd.desativado /etc/sudoers.d/90-billones-nopasswd
+SSH: /etc/ssh/sshd_config.d/50-nova.conf (sem root, 3 tentativas, só usuário billones); firewall: porta 22 só para redes 192.168.x.x e com limite de tentativas. Desligar de vez: Ajustes → Segurança → Acesso remoto, ou sudo systemctl disable --now ssh
+Kernel: /etc/sysctl.d/60-nova-seguranca.conf (remover e rodar sudo sysctl --system para voltar)
+Atualizações de segurança automáticas: unattended-upgrades (/etc/apt/apt.conf.d/20auto-upgrades)
+Bloqueio ao voltar do descanso/suspender: xss-lock em nova-sessao (opção bloqueio=0 desliga; Ajustes → Segurança)
+Logo: agora um "N" (marca.svg/png em ~/.local/share/nova/icons, /usr/share/nova, /usr/share/pixmaps/nova-marca.png, desenho em greeter.c). Logo "C" antiga: ~/.local/share/nova/icons-carmesim/marca-C-antigo.svg; greeter antigo: nova-greeter/greeter.c.bak-login2.
+SSH desligado de vez (2026-11-14). Para ligar: sudo /usr/local/sbin/nova-admin ssh-on   (ou Ajustes → Segurança → Acesso remoto). Desligar: sudo /usr/local/sbin/nova-admin ssh-off
+Loja corrigida: instalacao precisava do ajuste de admin (ver abaixo)
+Loja (2026-11-14): nova-admin apt-install falhava (grep 'Candidate' com sistema em português) -> LC_ALL=C. Loja nao roda mais apt-autoremove (removeria zenity/diodon). Backup: loja.c.bak-loja-fix. Janelas multiplas: gravador NON_UNIQUE; .desktop com acao 'Abrir nova janela'; clique do meio no dock abre nova.
+
+== Alt+Tab, dock e Loja (2026-11-14, sessão 2) ==
+Alt+Tab novo: serviço ~/.local/bin/nova-janelas (fonte ~/nova-janelas/janelas.c; compilar: ~/nova-comum/compilar janelas). Atalho chama ~/.local/bin/nova-alttab (rc.xml; backup: ~/.config/openbox/rc.xml.bak-alttab; para voltar ao Alt+Tab antigo restaure o backup e rode: openbox --reconfigure). Iniciado em nova-sessao.
+Pré-visualização no dock: mesmo serviço (passar o mouse no ícone mostra as janelas; clique abre; clique do meio fecha). Para funcionar o ZOOM do dock foi desligado: voltar com  dconf write /net/launchpad/plank/docks/dock1/zoom-enabled true  (a prévia fica menos precisa nas pontas).
+Clique direito no navegador: Abrir nova aba / nova janela / janela privada (nova-navegador --nova-aba|--nova-janela|--privada; nova-navegador.desktop).
+Loja: loja.c mostra o motivo do erro; Firefox não tem botão remover (backup loja.c.bak-janelas). nova-admin corrigido em ~/nova-medidas/nova-admin.novo (LC_ALL=C no apt-install + lista de pacotes protegidos no apt-remove). INSTALAR: sudo install -m755 -o root -g root ~/nova-medidas/nova-admin.novo /usr/local/sbin/nova-admin
+Loja (2): instalação/remoção via ~/.local/bin/nova-apt (plano B com senha por janela). loja.c usa isso; backup loja.c.bak-janelas.
+
+[2026-11-14] BOOT NOVA OS (Plymouth/GRUB): backup do estado anterior em ~/nova-medidas/backup-boot-2026-11-14/. Para desfazer tudo: sudo bash ~/nova-medidas/backup-boot-2026-11-14/RESTAURAR.sh
+[2026-11-14] Fontes do tema de boot: ~/nova-boot/ (gerar.py cria as imagens; instalar.sh instala).
+[2026-11-14] Login (desligar/reiniciar): regra polkit /etc/polkit-1/rules.d/49-nova-login-energia.rules. Tela de saída 'ATÉ LOGO!': ~/nova-boot/ate-logo.py (script antigo: nova-boot/nova-os.script.bak-ate-logo). Aplicar: sudo bash ~/nova-medidas/aplicar-login-e-ate-logo.sh

@@ -14,6 +14,7 @@ DEPS="openbox tint2 plank picom lightdm lightdm-gtk-greeter dunst feh pcmanfm xt
  flameshot network-manager network-manager-gnome ufw unattended-upgrades flatpak fonts-inter fonts-jetbrains-mono papirus-icon-theme
  imagemagick inotify-tools xdotool xss-lock xcape udiskie xclip brightnessctl pipewire pipewire-pulse wireplumber libnotify-bin zenity
  dconf-cli xinput x11-utils x11-xserver-utils xinit xorg mousepad blueman sudo diodon librsvg2-bin python3
+ firefox-esr firefox-esr-l10n-pt-br xsettingsd libfuse2t64 alsa-utils pipewire-alsa gvfs dbus-x11 xdg-utils curl git i965-va-driver vainfo
  build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev liblightdm-gobject-dev libpulse-dev libxcomposite-dev libx11-dev"
 if [ $SEM_DEP -eq 0 ]; then
   echo "==> Instalando pacotes (pede a senha)"; sudo apt-get update; sudo apt-get install -y $DEPS
@@ -59,7 +60,9 @@ if [ $SO_USUARIO -eq 0 ]; then
   sudo cp "$HOME"/.local/share/nova/icons/marca.* /usr/share/nova/ 2>/dev/null || true
   printf '[Seat:*]\ngreeter-session=nova-greeter\nuser-session=nova\ngreeter-hide-users=false\nallow-guest=false\n' | sudo tee /etc/lightdm/lightdm.conf.d/50-nova.conf >/dev/null
   sudo install -m644 "$AQUI/sistema/60-nova-seguranca.conf" /etc/sysctl.d/60-nova-seguranca.conf; sudo sysctl --system >/dev/null
-  if [ -d /usr/lib/firefox-esr/distribution ]; then sudo install -m644 "$AQUI/sistema/firefox-policies.json" /usr/lib/firefox-esr/distribution/policies.json; fi
+  if [ -d /usr/lib/firefox-esr/distribution ]; then sed "s#@HOME@#$HOME#g; s#@USER@#$U#g" "$AQUI/sistema/firefox-policies.json" | sudo tee /usr/lib/firefox-esr/distribution/policies.json >/dev/null; fi
+  sudo install -d /etc/polkit-1/rules.d; sudo install -m644 "$AQUI/sistema/49-nova-login-energia.rules" /etc/polkit-1/rules.d/49-nova-login-energia.rules
+  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' | sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
   sudo ufw default deny incoming >/dev/null; sudo ufw default allow outgoing >/dev/null; sudo ufw --force enable >/dev/null
   sudo systemctl enable --now clamav-freshclam unattended-upgrades 2>/dev/null || true
   sudo systemctl enable lightdm 2>/dev/null || true
