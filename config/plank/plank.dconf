@@ -7,5 +7,5 @@ position='bottom'
 pressure-reveal=false
 theme='Nova'
 unhide-delay=0
-zoom-enabled=true
+zoom-enabled=false
 zoom-percent=150
