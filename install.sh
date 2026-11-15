@@ -3,16 +3,17 @@
 #   --so-usuario       instala só a parte do usuário (sem login, firewall e ajustes de sistema)
 #   --sem-dependencias não instala pacotes (use se já tiver tudo)
 #   --boot / --sem-boot  instala (ou não) a tela de boot NOVA OS (mexe no GRUB). Sem nenhum dos dois, pergunta.
+#   --com-jogos        instala também o RetroArch (emuladores de jogos clássicos; baixa ~1 GB). Também dá pela Loja.
 #   --sim              não faz perguntas (usa as respostas padrão)
 #   --atualizar        modo atualização: mantém as suas escolhas (tema, dock, opções, login automático), instala só
 #                      pacotes que faltam e recompila só o que mudou. É o que a tela Ajustes → Atualizações usa.
 # Variáveis: NOVA_SIMULA=1 só mostra os comandos de administrador, sem executá-los (para testes).
 set -e
 AQUI=$(cd "$(dirname "$0")" && pwd); U=$(id -un)
-SO_USUARIO=0; SEM_DEP=0; BOOT=ask; ATUALIZAR=0; SIM=0
+SO_USUARIO=0; SEM_DEP=0; BOOT=ask; ATUALIZAR=0; SIM=0; COM_JOGOS=0
 for a in "$@"; do case $a in
   --so-usuario) SO_USUARIO=1;; --sem-dependencias) SEM_DEP=1;; --boot) BOOT=1;; --sem-boot) BOOT=0;;
-  --sim) SIM=1;; --atualizar) ATUALIZAR=1;; *) echo "opção desconhecida: $a"; exit 2;; esac; done
+  --sim) SIM=1;; --com-jogos) COM_JOGOS=1;; --atualizar) ATUALIZAR=1;; *) echo "opção desconhecida: $a"; exit 2;; esac; done
 [ "$(id -u)" -ne 0 ] || { echo "Rode como usuário comum (o instalador pede a senha só quando precisar)."; exit 1; }
 grep -q '^VERSION_ID="13"' /etc/os-release 2>/dev/null || echo "Aviso: o NOVA OS foi feito para Debian 13; em outra versão pode não funcionar."
 
@@ -145,6 +146,13 @@ if [ $SO_USUARIO -eq 0 ]; then
     fi
     if [ "$BOOT" = 1 ]; then echo "==> Tela de boot NOVA OS"; S bash "$AQUI/boot/instalar.sh"; fi
   fi
+fi
+
+if [ $COM_JOGOS -eq 1 ]; then
+  echo "==> Instalando o RetroArch (emuladores de jogos clássicos; pode demorar)"
+  if [ -n "$NOVA_SIMULA" ]; then echo "[simula] flatpak install RetroArch + nova-jogos-preparar"
+  elif flatpak install --user -y --noninteractive flathub org.libretro.RetroArch; then "$HOME/.local/bin/nova-jogos-preparar" || echo "aviso: rode 'nova-jogos-preparar' depois, com internet."
+  else echo "aviso: não consegui instalar o RetroArch agora; instale depois pela Loja."; fi
 fi
 
 # registra a versão instalada (a tela Ajustes → Atualizações compara com a do GitHub)

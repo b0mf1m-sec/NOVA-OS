@@ -37,6 +37,7 @@ static App apps[] = {
  { "Krita", "Pintura e ilustração digital", C_IMG, 'A', "krita", "krita", "krita" },
  { "Visualizador de imagens", "Ristretto: leve e rápido", C_IMG, 'A', "ristretto", "ristretto", "org.xfce.ristretto" },
  { "Steam", "A maior loja de jogos para PC", C_GAMES, 'F', "com.valvesoftware.Steam", NULL, "steam", TRUE },
+ { "RetroArch", "Jogos clássicos: NES, Super Nintendo, Mega Drive, Game Boy, PlayStation 1 e mais. Aceita controle por cabo ou Bluetooth", C_GAMES, 'F', "org.libretro.RetroArch", NULL, "retroarch", TRUE },
  { "SuperTuxKart", "Corrida de kart em 3D", C_GAMES, 'A', "supertuxkart", "supertuxkart", "supertuxkart" },
  { "Luanti", "Mundo de blocos (antigo Minetest)", C_GAMES, 'A', "luanti", "luanti", "minetest" },
  { "Paciência", "Dezenas de jogos de cartas", C_GAMES, 'A', "aisleriot", "sol", "gnome-aisleriot" },
@@ -175,7 +176,9 @@ static void next_op(void) {
         sh = g_strdup_printf("%s/.local/bin/nova-apt %s %s 2>&1", g_get_home_dir(), cur->remove ? "remove" : "install", a->pkgs);
     else
         sh = cur->remove ? g_strdup_printf("flatpak uninstall --user -y --noninteractive %s 2>&1", a->pkgs)
-                         : g_strdup_printf("flatpak install --user -y --noninteractive flathub %s 2>&1", a->pkgs);
+                         : !strcmp(a->pkgs, "org.libretro.RetroArch")      // RetroArch já sai pronto: emuladores, pasta de jogos e controles
+                           ? g_strdup_printf("flatpak install --user -y --noninteractive flathub %s 2>&1 && %s/.local/bin/nova-jogos-preparar 2>&1", a->pkgs, g_get_home_dir())
+                           : g_strdup_printf("flatpak install --user -y --noninteractive flathub %s 2>&1", a->pkgs);
     if (logfile) { fprintf(logfile, "\n$ %s\n", sh); fflush(logfile); }
     GSubprocess *p = g_subprocess_new(G_SUBPROCESS_FLAGS_STDOUT_PIPE, NULL, "sh", "-c", sh, NULL); g_free(sh);
     if (!p) { g_free(cur); cur = NULL; refresh_installed(); return; }

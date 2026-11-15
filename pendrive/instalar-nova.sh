@@ -59,8 +59,9 @@ fi
 
 # 4) pergunta única e instalação
 BOOTARG=--boot; pergunta "Instalar também a tela de boot do NOVA OS (logo ao ligar, sem textos)?" S || BOOTARG=--sem-boot
+JOGOSARG=""; pergunta "Instalar também o RetroArch (emuladores de jogos clássicos; baixa uns 1 GB)?" N && JOGOSARG=--com-jogos
 cor "Instalando o NOVA OS. Leva de 20 a 40 minutos; pode deixar o computador sozinho."
-bash "$DEST/install.sh" --sim $BOOTARG || erro "A instalação parou. Rode de novo: bash $DEST/install.sh --sim   (o log fica em ~/.local/share/nova/instalacao.log)"
+bash "$DEST/install.sh" --sim $BOOTARG $JOGOSARG || erro "A instalação parou. Rode de novo: bash $DEST/install.sh --sim   (o log fica em ~/.local/share/nova/instalacao.log)"
 
 echo
 echo "================================================"

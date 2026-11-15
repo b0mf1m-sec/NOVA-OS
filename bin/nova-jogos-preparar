@@ -1,0 +1,42 @@
+#!/bin/bash
+# Prepara o RetroArch (Flatpak) para uso simples: pasta ~/Jogos por console, núcleos (emuladores) dos consoles clássicos,
+# arquivos de menu e perfis de controle, tudo dos servidores oficiais do projeto libretro. Pode rodar de novo (só baixa o que falta).
+RA="$HOME/.var/app/org.libretro.RetroArch/config/retroarch"; B="https://buildbot.libretro.com"
+mkdir -p "$RA/cores" "$RA/info" "$RA/autoconfig" "$RA/assets" "$HOME/Jogos"
+for d in "Atari 2600" "NES" "Super Nintendo" "Master System" "Mega Drive" "Game Boy" "Game Boy Advance" "PlayStation"; do mkdir -p "$HOME/Jogos/$d"; done
+cat > "$HOME/Jogos/LEIA-ME.txt" <<'TXT'
+Coloque aqui os jogos que você possui (arquivos extraídos dos seus próprios cartuchos e discos),
+cada um na pasta do seu console. No RetroArch: Menu principal -> Importar conteúdo -> Escanear diretório -> escolha a pasta.
+Jogos legais e gratuitos: no RetroArch, Menu principal -> Baixador de conteúdo (homebrew, freeware, domínio público).
+PlayStation 1 precisa do arquivo de BIOS do seu próprio aparelho (scph5501.bin) na pasta de sistema do RetroArch.
+
+COMO EXTRAIR OS SEUS PRÓPRIOS JOGOS (a cópia que a lei permite é a que você mesmo faz do que possui):
+ - Cartuchos de Game Boy/GBC/GBA: leitor USB próprio (ex.: GB Operator, Joey Jr., Sanni Cart Reader).
+ - Cartuchos de NES, Super Nintendo e Mega Drive: leitor tipo Retrode ou Sanni Cart Reader (conecta por USB).
+ - Discos de PlayStation 1: coloque no leitor de CD/DVD de um PC e gere uma imagem .bin/.cue
+   (programas livres como cdrdao ou ImgBurn); o RetroArch lê .cue e .chd.
+ - A BIOS do PlayStation vem do seu próprio console (existem leitores/rotinas para extrair).
+Depois copie os arquivos para a pasta do console e escaneie no RetroArch.
+TXT
+bx() { curl -fsSL --max-time 300 -o "$2" "$1"; }
+ux() { python3 -I -c 'import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "$1" "$2"; }
+FALHAS=0
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+for c in fceumm snes9x genesis_plus_gx gambatte mgba pcsx_rearmed stella; do
+  [ -f "$RA/cores/${c}_libretro.so" ] && continue
+  echo "ETAPA: Baixando emulador $c"; bx "$B/nightly/linux/x86_64/latest/${c}_libretro.so.zip" "$T/$c.zip" && ux "$T/$c.zip" "$RA/cores" || { echo "aviso: não consegui baixar $c"; FALHAS=1; }
+done
+for a in info autoconfig assets; do
+  [ -n "$(ls -A "$RA/$a" 2>/dev/null)" ] && continue
+  echo "ETAPA: Baixando $a"; bx "$B/assets/frontend/$a.zip" "$T/$a.zip" && ux "$T/$a.zip" "$RA/$a" || { echo "aviso: não consegui baixar $a"; FALHAS=1; }
+done
+# preferências: português do Brasil, pasta de jogos, controles configurados sozinhos (só cria o arquivo se ainda não existir)
+if [ ! -f "$RA/retroarch.cfg" ]; then cat > "$RA/retroarch.cfg" <<CFG
+user_language = "7"
+rgui_browser_directory = "$HOME/Jogos"
+input_autodetect_enable = "true"
+video_fullscreen = "false"
+menu_driver = "ozone"
+CFG
+fi
+[ $FALHAS -eq 0 ] && echo "OK: RetroArch pronto" || { echo "ERRO: faltou baixar algo (internet?). Rode de novo: nova-jogos-preparar"; exit 1; }
