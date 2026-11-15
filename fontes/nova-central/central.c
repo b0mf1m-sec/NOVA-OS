@@ -105,6 +105,9 @@ static void on_bg_close(GtkWidget *w, gpointer i) { BgRow *r = &bg[GPOINTER_TO_I
 /* ---------- ações ---------- */
 static gboolean state_soon(gpointer d) { loading = TRUE; read_state(); loading = FALSE; return G_SOURCE_REMOVE; }
 static void on_wifi(GtkWidget *w, gpointer d) { nova_sh(wifi_on ? "nmcli radio wifi off" : "nmcli radio wifi on"); g_timeout_add(1500, state_soon, NULL); read_state(); }
+static void on_wifi_more(GtkWidget *w, gpointer d) {
+    char *c = g_strdup_printf("%s/.local/bin/nova-ajustes --pagina 4", g_get_home_dir()); nova_spawn(c); g_free(c); gtk_main_quit();
+}
 static void on_theme(GtkWidget *w, gpointer d) {
     char *c = g_strdup_printf("%s/.local/bin/nova-tema tema %s", g_get_home_dir(), nova_dark ? "claro" : "escuro"); nova_spawn(c); g_free(c); gtk_main_quit();
 }
@@ -140,7 +143,7 @@ static gboolean on_focus_out(GtkWidget *w, GdkEvent *e, gpointer d) { if ((g_get
 static gboolean on_key(GtkWidget *w, GdkEventKey *e, gpointer d) { if (e->keyval == GDK_KEY_Escape) gtk_main_quit(); return FALSE; }
 
 static GtkWidget *tile(GtkWidget *child) { GtkWidget *t = cls(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0), "tile"); gtk_container_add(GTK_CONTAINER(t), child); tiles[ntiles++] = t; return t; }
-static GtkWidget *toggle_tile(const char *icon, const char *name, GtkWidget **btn, GtkWidget **sub, GCallback cb) {
+static GtkWidget *toggle_tile(const char *icon, const char *name, GtkWidget **btn, GtkWidget **sub, GCallback cb, GCallback more) {
     GtkWidget *h = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     *btn = cls(gtk_button_new_from_icon_name(icon, GTK_ICON_SIZE_MENU), "tg"); gtk_widget_set_valign(*btn, GTK_ALIGN_CENTER); gtk_widget_set_can_focus(*btn, FALSE);
     g_signal_connect(*btn, "clicked", cb, NULL);
@@ -148,6 +151,10 @@ static GtkWidget *toggle_tile(const char *icon, const char *name, GtkWidget **bt
     *sub = lbl("", "tsub", 0); gtk_label_set_ellipsize(GTK_LABEL(*sub), PANGO_ELLIPSIZE_END); gtk_label_set_max_width_chars(GTK_LABEL(*sub), 11);
     gtk_box_pack_start(GTK_BOX(v), lbl(name, "tname", 0), FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(v), *sub, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(h), *btn, FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(h), v, TRUE, TRUE, 0);
+    if (more) {   // seta "›": abre a lista de opções (como o Windows)
+        GtkWidget *m = cls(gtk_button_new_with_label("›"), "more"); gtk_button_set_relief(GTK_BUTTON(m), GTK_RELIEF_NONE); gtk_widget_set_can_focus(m, FALSE); gtk_widget_set_valign(m, GTK_ALIGN_CENTER);
+        gtk_widget_set_tooltip_text(m, "Escolher rede"); g_signal_connect(m, "clicked", more, NULL); gtk_box_pack_end(GTK_BOX(h), m, FALSE, FALSE, 0);
+    }
     return tile(h);
 }
 static GtkWidget *slider_tile(const char *icon, const char *name, GtkWidget **scale, GCallback cb) {
@@ -170,6 +177,7 @@ static const char *CSS =
 ".root { padding: 12px; }"
 ".tile { border-radius: 14px; background-color: alpha(@card,.66); border: 1px solid alpha(@fg,.07); box-shadow: 0 1px 3px alpha(#000,.07); padding: 10px 12px; }"
 ".tname { font-size: 13px; font-weight: 600; color: @fg; } .tsub { font-size: 11.5px; color: @fg2; }"
+"button.more { background-image: none; background-color: transparent; border: none; box-shadow: none; color: @fg2; font-size: 20px; padding: 0 4px; min-width: 18px; min-height: 30px; }" "button.more:hover { color: @fg; }"
 "button.tg { border-radius: 999px; min-width: 34px; min-height: 34px; padding: 0; border: none; box-shadow: none; background-image: none;"
 "  background-color: alpha(@fg,.10); color: @fg; transition: all 260ms cubic-bezier(.3,1.7,.5,1); }"
 "button.tg:hover { -gtk-icon-transform: scale(1.2); }"
@@ -205,12 +213,12 @@ static void activate(GtkApplication *app, gpointer d) {
     gtk_container_add(GTK_CONTAINER(win), v);
 
     GtkWidget *r1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10); gtk_box_set_homogeneous(GTK_BOX(r1), TRUE);
-    gtk_box_pack_start(GTK_BOX(r1), toggle_tile("network-wireless-symbolic", "Wi-Fi", &wifi_btn, &wifi_sub, G_CALLBACK(on_wifi)), TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(r1), toggle_tile("weather-clear-night-symbolic", "Modo escuro", &theme_btn, &theme_sub, G_CALLBACK(on_theme)), TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(r1), toggle_tile("network-wireless-symbolic", "Wi-Fi", &wifi_btn, &wifi_sub, G_CALLBACK(on_wifi), G_CALLBACK(on_wifi_more)), TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(r1), toggle_tile("weather-clear-night-symbolic", "Modo escuro", &theme_btn, &theme_sub, G_CALLBACK(on_theme), NULL), TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(v), r1, FALSE, FALSE, 0);
     GtkWidget *r2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10); gtk_box_set_homogeneous(GTK_BOX(r2), TRUE);
-    gtk_box_pack_start(GTK_BOX(r2), toggle_tile("bluetooth-active-symbolic", "Bluetooth", &bt_btn, &bt_sub, G_CALLBACK(on_bt)), TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(r2), toggle_tile("notifications-disabled-symbolic", "Não perturbe", &dnd_btn, &dnd_sub, G_CALLBACK(on_dnd)), TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(r2), toggle_tile("bluetooth-active-symbolic", "Bluetooth", &bt_btn, &bt_sub, G_CALLBACK(on_bt), NULL), TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(r2), toggle_tile("notifications-disabled-symbolic", "Não perturbe", &dnd_btn, &dnd_sub, G_CALLBACK(on_dnd), NULL), TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(v), r2, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(v), slider_tile("display-brightness-symbolic", "Brilho da tela", &bri, G_CALLBACK(on_bri)), FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(v), slider_tile("audio-volume-high-symbolic", "Som", &vol, G_CALLBACK(on_vol)), FALSE, FALSE, 0);

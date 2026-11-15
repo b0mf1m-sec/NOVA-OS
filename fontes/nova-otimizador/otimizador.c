@@ -233,6 +233,32 @@ static void net_update(void) {
     net_rx0 = rx; net_tx0 = tx; net_t0 = now;
     if (net_ticks++ % 8 == 0) net_info_refresh();
 }
+/* ---------- teste de velocidade (servidor público de testes da Cloudflare) ---------- */
+static GtkWidget *speed_btn, *speed_res;
+static void speed_done(GObject *src, GAsyncResult *res, gpointer d) {
+    char *so = NULL; g_subprocess_communicate_utf8_finish(G_SUBPROCESS(src), res, &so, NULL, NULL);
+    double lat = 0, dn = 0, up = 0; char t[160]; char **f = so ? g_strsplit(so, " ", 3) : NULL;
+    if (f && f[0] && f[1] && f[2]) { lat = g_ascii_strtod(f[0], NULL); dn = g_ascii_strtod(f[1], NULL); up = g_ascii_strtod(f[2], NULL); }
+    g_strfreev(f);
+    if (dn > 1000) {
+        double ms = lat * 1000; if (ms < 0) ms = 0;
+        g_snprintf(t, sizeof t, "Resultado: ↓ %.1f Mbps  ·  ↑ %.1f Mbps  ·  resposta %.0f ms", dn * 8 / 1e6, up * 8 / 1e6, ms);
+    } else g_snprintf(t, sizeof t, "Não foi possível medir. Confira se há internet e tente de novo.");
+    gtk_label_set_text(GTK_LABEL(speed_res), t); gtk_button_set_label(GTK_BUTTON(speed_btn), "Testar de novo"); gtk_widget_set_sensitive(speed_btn, TRUE);
+    g_free(so); g_object_unref(src);
+}
+static void on_speed(GtkWidget *w, gpointer d) {
+    gtk_widget_set_sensitive(speed_btn, FALSE); gtk_button_set_label(GTK_BUTTON(speed_btn), "Testando…");
+    gtk_label_set_text(GTK_LABEL(speed_res), "Medindo… leva uns 15 segundos. Evite baixar outras coisas agora.");
+    const char *argv[] = { "sh", "-c",
+        "U=https://speed.cloudflare.com; "
+        "l=$(curl -s -o /dev/null -w '%{time_starttransfer} %{time_appconnect}' --max-time 5 \"$U/__down?bytes=0\" | LC_ALL=C awk '{printf \"%.3f\", $1-$2}'); "
+        "d=$(curl -s -o /dev/null -w '%{speed_download}' --max-time 8 \"$U/__down?bytes=50000000\"); "
+        "u=$(head -c 30000000 /dev/zero | curl -s -o /dev/null -w '%{speed_upload}' --max-time 6 -X POST --data-binary @- \"$U/__up\"); "
+        "echo \"${l:-0} ${d:-0} ${u:-0}\"", NULL };
+    GSubprocess *p = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE, NULL);
+    if (p) g_subprocess_communicate_utf8_async(p, NULL, NULL, speed_done, NULL); else gtk_widget_set_sensitive(speed_btn, TRUE);
+}
 static gboolean tick_data(gpointer d) {
     net_update();
     sample_mem(); sample_cpu();
@@ -456,6 +482,10 @@ int main(int argc, char **argv) {
     gtk_box_pack_start(GTK_BOX(np), nr, FALSE, FALSE, 0);
     gtk_label_set_ellipsize(GTK_LABEL(net_info), PANGO_ELLIPSIZE_END); gtk_widget_set_margin_top(net_info, 4);
     gtk_box_pack_start(GTK_BOX(np), net_info, FALSE, FALSE, 0);
+    speed_btn = cls(cls(gtk_button_new_with_label("Testar velocidade"), "pill"), "soft"); gtk_widget_set_halign(speed_btn, GTK_ALIGN_START); gtk_widget_set_margin_top(speed_btn, 6);
+    g_signal_connect(speed_btn, "clicked", G_CALLBACK(on_speed), NULL); gtk_box_pack_start(GTK_BOX(np), speed_btn, FALSE, FALSE, 0);
+    speed_res = lbl("Mede o máximo da sua internet. Gasta até uns 60 MB de dados.", "tsub", 0); gtk_label_set_line_wrap(GTK_LABEL(speed_res), TRUE); gtk_label_set_max_width_chars(GTK_LABEL(speed_res), 44);
+    gtk_box_pack_start(GTK_BOX(np), speed_res, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(right), np, FALSE, FALSE, 0);
     GtkWidget *lv = cls(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 14), "glasspanel"); gtk_widget_set_margin_top(lv, 12);
     GtkWidget *lt = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2); gtk_widget_set_margin_top(lt, 6); gtk_widget_set_margin_bottom(lt, 6);
