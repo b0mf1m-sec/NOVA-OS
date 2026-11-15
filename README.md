@@ -50,6 +50,24 @@ Base: Openbox + tint2 + Plank + picom.
 - **Espaço e tempo:** cerca de **6 GB livres** no disco. A instalação baixa mais de mil pacotes e compila os apps: leva de **20 a 40 minutos**, conforme a internet e o processador.
 - **Tela:** funciona de 1366x768 para cima.
 
+## Instalação rápida com pendrive (um comando)
+
+Para instalar o NOVA OS **idêntico** em outro computador sem lembrar de nada: monte o pendrive com `tools/atualizar-pendrive.sh` (ele grava o pacote, o instalador e um `LEIA-ME-PRIMEIRO.txt`). No computador novo, com o Debian 13 mínimo instalado e internet, plugue o pendrive e rode **um** comando:
+
+```bash
+su -c 'mkdir -p /mnt/pen && mount -o ro /dev/disk/by-label/Ventoy /mnt/pen' && bash /mnt/pen/instalar-nova.sh
+```
+
+(sem senha de root no Debian? use `sudo mkdir -p /mnt/pen && sudo mount -o ro /dev/disk/by-label/Ventoy /mnt/pen && bash /mnt/pen/instalar-nova.sh`)
+
+O `instalar-nova.sh` libera o `sudo`, instala tudo e, se houver internet, **confere o GitHub**: havendo versão mais nova que a do pendrive, ele avisa e pergunta se você quer usá-la.
+
+## Atualizações dentro do sistema
+
+Em **Ajustes → Atualizações**, o botão **Verificar atualização** compara a versão instalada com a do repositório no GitHub. Se houver novidades, mostra o que muda e só instala **depois da sua confirmação** (pede a senha do computador). A atualização mantém as suas escolhas (tema, dock, opções, login automático), instala só os pacotes que faltam e recompila só o que mudou. Ao ligar o computador há um aviso opcional (no máximo 1 vez por dia, nunca instala sozinho; dá para desligar na mesma tela). Pela linha de comando: `nova-atualizar verificar` / `nova-atualizar instalar`.
+
+> Segurança: a atualização baixa o código do ramo `main` deste repositório por HTTPS e o executa no seu computador (inclusive partes de sistema, com a sua senha). Só instala depois de você confirmar e só confie em repositórios seus.
+
 ## Instalação passo a passo
 
 > Nunca usou Linux? Siga na ordem. Cada passo diz o que digitar.
@@ -108,15 +126,19 @@ Na tela de login, digite a senha e, se aparecer um seletor de sessão, escolha *
 ### Opções do instalador
 
 - `./install.sh --so-usuario` instala só a parte da sua conta, sem tela de login, firewall e ajustes de sistema. Bom para **testar sem mudar o computador todo**: depois, numa sessão de texto, rode `startx`.
+- `NOVA_SIMULA=1 ./install.sh ...` só mostra os comandos de administrador, sem executá-los (para testes).
 - `./install.sh --sem-dependencias` pula a instalação de pacotes (use se já tiver tudo).
+- `./install.sh --sim` não faz perguntas (usa as respostas padrão); `--sem-boot` pula a tela de boot; `--atualizar` é o modo usado pela tela de Atualizações.
 - `./install.sh --boot` **(opcional)** instala também a tela de boot NOVA OS (logo animado ao ligar, desligar e reiniciar). Ela altera o GRUB (menu escondido; aperte `Esc` ao ligar para vê-lo) e o initramfs. Para voltar ao normal: `sudo bash boot/desinstalar.sh`.
 
 ### Atualizar
 
+O jeito simples é **Ajustes → Atualizações** (veja acima). Pela linha de comando:
+
 ```bash
 cd NOVA-OS
 git pull
-./install.sh --sem-dependencias
+./install.sh --atualizar
 ```
 
 ### Desinstalar

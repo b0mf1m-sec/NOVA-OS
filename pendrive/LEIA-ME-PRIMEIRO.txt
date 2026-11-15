@@ -1,0 +1,35 @@
+NOVA OS - INSTALAÇÃO PELO PENDRIVE
+===================================
+
+1) Instale o Debian 13 (a ISO "debian-13...netinst.iso" está neste pendrive: ligue o PC por ele e escolha-a).
+   Na tela "Seleção de programas": DESMARQUE todos os ambientes gráficos (GNOME, KDE...) e deixe marcado
+   só "utilitários padrão do sistema". O NOVA OS traz a parte gráfica. O PC precisa estar com internet.
+
+2) Com o Debian instalado, ligue o PC, entre com o seu usuário e deixe ESTE pendrive plugado.
+
+3) Digite UM comando (copie exatamente):
+
+   su -c 'mkdir -p /mnt/pen && mount -o ro /dev/disk/by-label/Ventoy /mnt/pen' && bash /mnt/pen/instalar-nova.sh
+
+   (pede a senha de root uma vez. Se você NÃO criou senha de root na instalação do Debian, use este:)
+
+   sudo mkdir -p /mnt/pen && sudo mount -o ro /dev/disk/by-label/Ventoy /mnt/pen && bash /mnt/pen/instalar-nova.sh
+
+4) Responda às duas perguntas (tela de boot: S) e espere de 20 a 40 minutos. Ao final, reinicie.
+
+O QUE O INSTALADOR FAZ SOZINHO
+ - libera o sudo para o seu usuário, instala todos os programas necessários e o NOVA OS;
+ - se houver internet, confere o GitHub: havendo versão mais nova que a do pendrive, ele AVISA e PERGUNTA
+   se você quer usá-la (você escolhe);
+ - escolhe o driver de vídeo conforme a placa do computador.
+
+DEPOIS DE INSTALADO
+ - Ajustes -> Atualizações -> "Verificar atualização": procura novidades no GitHub e, se você confirmar, instala.
+   Suas escolhas (tema, dock, opções) são mantidas.
+
+SE ALGO DER ERRADO
+ - Rode o comando do passo 3 de novo (é seguro repetir).
+ - O registro fica em ~/.local/share/nova/instalacao.log
+ - Plano B com IA: abra o Claude Code neste pendrive e peça "leia o NOVA-OS/LEIA-ME-CLAUDE.md e conclua a instalação"
+   (o arquivo está dentro do NOVA-OS.tar.gz; extraia com: tar xzf /mnt/pen/NOVA-OS.tar.gz -C ~).
+ - Se o comando "mount" disser que não achou "Ventoy", veja o nome com:  lsblk -f   e troque no comando.

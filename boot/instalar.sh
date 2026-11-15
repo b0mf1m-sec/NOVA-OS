@@ -17,7 +17,7 @@ printf '[Daemon]\nTheme=nova-os\nShowDelay=0\nDeviceScale=1\n' > /etc/plymouth/p
 # GRUB: sem texto, menu escondido (aperte Esc ao ligar para ver o menu)
 sed -i -E 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 rd.udev.log_level=0 udev.log_priority=0 vt.global_cursor_default=0"/' /etc/default/grub
 sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
-for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_GFXMODE=1366x768' 'GRUB_GFXPAYLOAD_LINUX=keep'; do
+for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_GFXMODE=auto' 'GRUB_GFXPAYLOAD_LINUX=keep'; do
   k="${kv%%=*}"
   if grep -qE "^#?$k=" /etc/default/grub; then sed -i -E "s|^#?$k=.*|$kv|" /etc/default/grub; else echo "$kv" >> /etc/default/grub; fi
 done

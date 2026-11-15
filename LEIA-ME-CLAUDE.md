@@ -6,13 +6,18 @@ O usuário quer que este PC fique **idêntico** a outro que já roda o **NOVA OS
 - Os usuários finais (pais do dono) **não sabem usar terminal**. O dono do PC entende um pouco, mas prefere **explicações curtas, em português simples**.
 - Teste ao fim de cada etapa e corrija até passar. Não dê instruções vagas: diga exatamente o que digitar.
 
+## Atenção: caminho mais simples
+Se a pasta veio do pendrive com o `instalar-nova.sh` ao lado, o usuário normalmente roda só ele (`bash /mnt/pen/instalar-nova.sh`): ele já faz os passos 1 a 3 abaixo (sudo, extração, `install.sh --sim`). Seu papel nesse caso é **ajudar se algo falhar** (log em `~/.local/share/nova/instalacao.log`; rodar de novo é seguro) e conferir o passo 5.
+Atualizações do sistema: Ajustes → Atualizações (`bin/nova-atualizar`, compara com o GitHub `b0mf1m-sec/NOVA-OS`; instala com `install.sh --atualizar`, que preserva as escolhas do usuário).
+**Ao testar o instalador numa máquina que já roda o NOVA OS:** use HOME falso, `NOVA_SIMULA=1`, `env -u DISPLAY` e um `dconf` falso no PATH (o `dconf load` alcança o banco real mesmo com HOME falso e reconfigura o dock do usuário).
+
 ## Passo a passo
 
 1. **Confira o ponto de partida**: `cat /etc/os-release` deve mostrar Debian 13 (trixie). Rode como **usuário comum** (não root). Precisa de internet: `ping -c1 deb.debian.org`.
 2. **Copie a pasta para o disco** (não rode direto do pendrive, ele pode ser somente leitura ou lento):
    `cp -r /caminho/do/pendrive/NOVA-OS ~/NOVA-OS && cd ~/NOVA-OS`
 3. **Instale**: `./install.sh` (pede a senha do sudo; leva de 20 a 40 min; baixa mais de mil pacotes e compila os apps).
-   - Para instalar também a tela de boot (Plymouth/GRUB): `./install.sh --boot`. **Antes**, abra `boot/instalar.sh` e ajuste `GRUB_GFXMODE=1366x768` para a resolução real do monitor deste PC (`xrandr` ou `cat /sys/class/drm/*/modes`). Se o PC for UEFI/BIOS diferente, confira que `update-grub` terminou sem erro.
+   - Para instalar também a tela de boot (Plymouth/GRUB): `./install.sh --boot`. **Antes**, abra `boot/instalar.sh` e o GRUB já usa resolução automática (`GRUB_GFXMODE=auto`); só mexa se a tela de boot sair esticada.
 4. **Reinicie** e, na tela de login, a sessão já deve ser a **NOVA OS** (vem como padrão pelo `lightdm.conf.d/50-nova.conf`).
 5. **Confira, item por item** (e corrija o que falhar):
    - Login aparece com o "N" e os botões Desligar/Reiniciar funcionam (regra polkit `/etc/polkit-1/rules.d/49-nova-login-energia.rules`).

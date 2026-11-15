@@ -33,6 +33,7 @@ pgrep -x udiskie >/dev/null || udiskie --automount --notify --no-tray &
 pgrep -f nova-bateria-vigia >/dev/null || "$HOME/.local/bin/nova-bateria-vigia" &
 [ "$(cfg antivirus 1)" = 1 ] && { pgrep -f nova-vigia-downloads >/dev/null || "$HOME/.local/bin/nova-vigia-downloads" & }
 pgrep -f nova-varredura-agenda >/dev/null || "$HOME/.local/bin/nova-varredura-agenda" &
+( sleep 150; "$HOME/.local/bin/nova-atualizar" aviso ) &       # avisa (sem instalar) se houver atualização do NOVA OS; opção atualiza_aviso
 systemctl is-active -q bluetooth && { pgrep -x blueman-applet >/dev/null || blueman-applet & }
 [ "$LEVE" = 1 ] || [ "$(sed -n 's/^papel = //p' "$HOME/.config/nova/config")" != vivo ] || [ ! -x "$HOME/.local/bin/nova-papel" ] || "$HOME/.local/bin/nova-papel" &
 "$HOME/.local/bin/nova-desempenho" reaplicar

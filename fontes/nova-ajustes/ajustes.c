@@ -7,10 +7,10 @@ static GtkWidget *win, *side, *stack, *list;
 static char *self_path; static gboolean loading = TRUE;
 static char *BIN;                                           // ~/.local/bin/
 
-static const char *PAGES[] = { "Aparência", "Papel de parede", "Dock", "Tela e som", "Rede e Bluetooth", "Segurança", "Aplicativos", "Atalhos", "Sobre" };
+static const char *PAGES[] = { "Aparência", "Papel de parede", "Dock", "Tela e som", "Rede e Bluetooth", "Segurança", "Aplicativos", "Atalhos", "Atualizações", "Sobre" };
 static const char *PICON[] = { "preferences-desktop-appearance-symbolic", "preferences-desktop-wallpaper-symbolic", "view-app-grid-symbolic",
-    "preferences-desktop-display-symbolic", "network-wireless-symbolic", "security-high-symbolic", "application-x-executable-symbolic", "input-keyboard-symbolic", "help-about-symbolic" };
-#define NPAGES 9
+    "preferences-desktop-display-symbolic", "network-wireless-symbolic", "security-high-symbolic", "application-x-executable-symbolic", "input-keyboard-symbolic", "system-software-update-symbolic", "help-about-symbolic" };
+#define NPAGES 10
 
 static void setc(GtkWidget *w, const char *c, gboolean on) { GtkStyleContext *s = gtk_widget_get_style_context(w); if (on) gtk_style_context_add_class(s, c); else gtk_style_context_remove_class(s, c); }
 static char *cfg(const char *key, const char *def) { char *c = g_strdup_printf("%snova-config -g %s %s", BIN, key, def), *o = nova_sh(c); g_free(c); return o; }
@@ -629,6 +629,128 @@ static GtkWidget *page_atalhos(void) {
     return p;
 }
 
+/* ---------- Atualizações (compara com o repositório do NOVA OS no GitHub) ---------- */
+static GtkWidget *up_status, *up_check, *up_ver, *up_inst_grp, *up_wrap, *up_changes, *up_step, *up_bar;
+static gboolean up_busy; static GSubprocess *up_proc; static GDataInputStream *up_in; static char *up_erro; static guint up_pulse;
+
+static char *up_version_text(void) {
+    char *f = g_build_filename(g_get_home_dir(), ".local/share/nova/versao", NULL), *s = NULL, *t = NULL;
+    if (g_file_get_contents(f, &s, NULL, NULL)) { char **l = g_strsplit(s, "\n", 3); if (l[0] && strlen(l[0]) >= 7) t = g_strdup_printf("%.7s · %s", l[0], l[1] ? l[1] : ""); g_strfreev(l); }
+    g_free(f); g_free(s); return t ? t : g_strdup("não registrada");
+}
+static void showw(GtkWidget *w) { gtk_widget_set_no_show_all(w, FALSE); gtk_widget_show_all(w); }
+static void up_clear_changes(void) { gtk_container_foreach(GTK_CONTAINER(up_changes), (GtkCallback)gtk_widget_destroy, NULL); }
+static void up_check_done(gboolean ok, const char *out, gpointer d) {
+    char **ln = g_strsplit(out, "\n", -1), *estado = NULL, *disp = NULL, *data = NULL; up_clear_changes(); int n = 0;
+    for (char **p = ln; *p; p++) {
+        if (g_str_has_prefix(*p, "estado=")) estado = *p + 7; else if (g_str_has_prefix(*p, "disponivel=")) disp = *p + 11; else if (g_str_has_prefix(*p, "data_disponivel=")) data = *p + 16;
+        else if (g_str_has_prefix(*p, "mudanca=")) {
+            char *t = g_strdup_printf("•  %s", *p + 8); GtkWidget *l = lbl(t, "rsub", 0); g_free(t);
+            gtk_label_set_line_wrap(GTK_LABEL(l), TRUE); gtk_label_set_max_width_chars(GTK_LABEL(l), 62); gtk_widget_set_margin_start(l, 14); gtk_widget_set_margin_end(l, 14); gtk_widget_set_margin_top(l, 7); gtk_widget_set_margin_bottom(l, 7);
+            gtk_box_pack_start(GTK_BOX(up_changes), l, FALSE, FALSE, 0); n++;
+        }
+    }
+    char *t;
+    if (estado && !strcmp(estado, "atual")) t = g_strdup("Seu sistema está atualizado ✓");
+    else if (estado && (!strcmp(estado, "nova") || !strcmp(estado, "desconhecida")))
+        t = g_strdup_printf("Há uma atualização disponível (versão %s, de %s). Veja as novidades abaixo e toque em Instalar.", disp ? disp : "?", data ? data : "?");
+    else t = g_strdup("Não foi possível verificar. Confira se o computador está com internet e tente de novo.");
+    gtk_label_set_text(GTK_LABEL(up_status), t); g_free(t);
+    gboolean nova = estado && (!strcmp(estado, "nova") || !strcmp(estado, "desconhecida"));
+    if (nova) { showw(up_inst_grp); if (n) showw(up_wrap); else gtk_widget_hide(up_wrap); } else { gtk_widget_hide(up_inst_grp); gtk_widget_hide(up_wrap); }
+    { char *vt = up_version_text(); gtk_label_set_text(GTK_LABEL(up_ver), vt); g_free(vt); }
+    gtk_button_set_label(GTK_BUTTON(up_check), "Verificar de novo"); gtk_widget_set_sensitive(up_check, TRUE); up_busy = FALSE;
+    g_strfreev(ln);
+}
+static void on_up_check(GtkWidget *w, gpointer d) {
+    if (up_busy) return; up_busy = TRUE; gtk_widget_set_sensitive(up_check, FALSE); gtk_button_set_label(GTK_BUTTON(up_check), "Verificando…");
+    gtk_label_set_text(GTK_LABEL(up_status), "Consultando o repositório do NOVA OS na internet…");
+    char *c = g_strdup_printf("%snova-atualizar", BIN); const char *a[] = { c, "verificar", NULL }; run_async(a, NULL, up_check_done, NULL); g_free(c);
+}
+
+static void up_finish(GObject *src, GAsyncResult *res, gpointer d) {
+    g_subprocess_wait_finish(G_SUBPROCESS(src), res, NULL); gboolean ok = g_subprocess_get_successful(G_SUBPROCESS(src));
+    if (up_pulse) { g_source_remove(up_pulse); up_pulse = 0; }
+    gtk_widget_hide(up_bar); gtk_widget_hide(up_step); up_busy = FALSE;
+    g_clear_object(&up_in); g_clear_object(&up_proc);
+    char *v = up_version_text(); gtk_label_set_text(GTK_LABEL(up_ver), v); g_free(v);
+    if (ok) {
+        gtk_label_set_text(GTK_LABEL(up_status), "Atualização instalada ✓");
+        gtk_widget_hide(up_inst_grp); gtk_widget_hide(up_wrap);
+        GtkWidget *dlg = gtk_message_dialog_new(GTK_WINDOW(win), GTK_DIALOG_MODAL, GTK_MESSAGE_INFO, GTK_BUTTONS_NONE, "Atualização instalada!");
+        gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dlg), "Para aplicar todas as novidades, reinicie o computador. Pode ser agora ou mais tarde.");
+        gtk_dialog_add_button(GTK_DIALOG(dlg), "Mais tarde", GTK_RESPONSE_CANCEL); gtk_dialog_add_button(GTK_DIALOG(dlg), "Reiniciar agora", GTK_RESPONSE_OK);
+        gboolean rb = gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK; gtk_widget_destroy(dlg); if (rb) nova_spawn("systemctl reboot");
+    } else {
+        gtk_widget_set_sensitive(up_check, TRUE); showw(up_inst_grp);
+        gboolean pw = up_erro && strstr(up_erro, "senha");
+        gtk_label_set_text(GTK_LABEL(up_status), pw ? "Senha incorreta. Toque em Instalar para tentar de novo." : "A atualização não foi concluída. Toque em Instalar para tentar de novo.");
+        msg_box(pw ? "Senha incorreta" : "A atualização não terminou",
+                pw ? "A senha digitada não confere. Use a mesma senha com que você entra no computador." : up_erro ? up_erro : "Tente de novo. Se continuar, os detalhes ficam em ~/.local/share/nova/instalacao.log");
+    }
+    g_free(up_erro); up_erro = NULL;
+}
+static void up_line(GObject *src, GAsyncResult *res, gpointer d) {
+    char *ln = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(src), res, NULL, NULL);
+    if (!ln) { g_subprocess_wait_async(up_proc, NULL, up_finish, NULL); return; }
+    const char *txt = NULL;
+    if (g_str_has_prefix(ln, "ETAPA: ")) txt = ln + 7; else if (g_str_has_prefix(ln, "==> ")) txt = ln + 4;
+    else if (g_str_has_prefix(ln, "ERRO: ")) { g_free(up_erro); up_erro = g_strdup(ln + 6); }
+    if (txt) gtk_label_set_text(GTK_LABEL(up_step), txt);
+    g_free(ln); g_data_input_stream_read_line_async(G_DATA_INPUT_STREAM(src), G_PRIORITY_DEFAULT, NULL, up_line, NULL);
+}
+static gboolean up_pulse_cb(gpointer d) { gtk_progress_bar_pulse(GTK_PROGRESS_BAR(up_bar)); return G_SOURCE_CONTINUE; }
+static char *ask_admin(void) {
+    GtkWidget *dlg = gtk_dialog_new_with_buttons("Senha do administrador", GTK_WINDOW(win), GTK_DIALOG_MODAL, "Cancelar", GTK_RESPONSE_CANCEL, "Continuar", GTK_RESPONSE_OK, NULL);
+    GtkWidget *box = gtk_dialog_get_content_area(GTK_DIALOG(dlg)); gtk_container_set_border_width(GTK_CONTAINER(box), 18); gtk_box_set_spacing(GTK_BOX(box), 10);
+    gtk_box_pack_start(GTK_BOX(box), lbl("Digite a senha que você usa para entrar no computador", "rtitle", 0), FALSE, FALSE, 0);
+    GtkWidget *en = gtk_entry_new(); gtk_entry_set_visibility(GTK_ENTRY(en), FALSE); gtk_entry_set_activates_default(GTK_ENTRY(en), TRUE); gtk_widget_set_size_request(en, 300, -1);
+    gtk_box_pack_start(GTK_BOX(box), en, FALSE, FALSE, 0);
+    GtkWidget *ck = gtk_check_button_new_with_label("Mostrar senha"); g_signal_connect(ck, "toggled", G_CALLBACK(on_pw_show), en); gtk_box_pack_start(GTK_BOX(box), ck, FALSE, FALSE, 0);
+    gtk_dialog_set_default_response(GTK_DIALOG(dlg), GTK_RESPONSE_OK); gtk_widget_show_all(dlg); gtk_widget_grab_focus(en);
+    char *pw = NULL; if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK && *gtk_entry_get_text(GTK_ENTRY(en))) pw = g_strdup(gtk_entry_get_text(GTK_ENTRY(en)));
+    gtk_widget_destroy(dlg); return pw;
+}
+static void on_up_install(GtkWidget *w, gpointer d) {
+    if (up_busy) return;
+    GtkWidget *dlg = gtk_message_dialog_new(GTK_WINDOW(win), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE, "Instalar a atualização?");
+    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dlg), "O computador vai baixar as novidades e instalá-las. Pode levar alguns minutos; não desligue durante o processo. Suas configurações e arquivos continuam como estão.");
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "Agora não", GTK_RESPONSE_CANCEL); gtk_dialog_add_button(GTK_DIALOG(dlg), "Instalar", GTK_RESPONSE_OK); gtk_dialog_set_default_response(GTK_DIALOG(dlg), GTK_RESPONSE_OK);
+    gboolean go = gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK; gtk_widget_destroy(dlg); if (!go) return;
+    char *pw = ask_admin(); if (!pw) return;
+    char *c = g_strdup_printf("%snova-atualizar", BIN); const char *a[] = { c, "instalar", NULL };
+    up_proc = g_subprocess_newv(a, G_SUBPROCESS_FLAGS_STDIN_PIPE | G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_MERGE, NULL); g_free(c);
+    if (!up_proc) { memset(pw, 0, strlen(pw)); g_free(pw); msg_box("Não foi possível iniciar", "O programa de atualização não foi encontrado."); return; }
+    GOutputStream *o = g_subprocess_get_stdin_pipe(up_proc); char *l = g_strdup_printf("%s\n", pw);
+    g_output_stream_write_all(o, l, strlen(l), NULL, NULL, NULL); g_output_stream_close(o, NULL, NULL);
+    memset(l, 0, strlen(l)); g_free(l); memset(pw, 0, strlen(pw)); g_free(pw);
+    up_busy = TRUE; gtk_widget_set_sensitive(up_check, FALSE); gtk_widget_hide(up_inst_grp);
+    gtk_label_set_text(GTK_LABEL(up_status), "Instalando a atualização. Não desligue o computador."); gtk_label_set_text(GTK_LABEL(up_step), "Começando…");
+    gtk_widget_show(up_step); gtk_widget_show(up_bar); up_pulse = g_timeout_add(120, up_pulse_cb, NULL);
+    up_in = g_data_input_stream_new(g_subprocess_get_stdout_pipe(up_proc)); g_data_input_stream_read_line_async(up_in, G_PRIORITY_DEFAULT, NULL, up_line, NULL);
+}
+static void on_up_aviso(GObject *s, GParamSpec *p, gpointer d) { if (!loading) cfg_set("atualiza_aviso", gtk_switch_get_active(GTK_SWITCH(s)) ? "1" : "0"); }
+static GtkWidget *page_atualiza(void) {
+    GtkWidget *p = page_new("Atualizações", "Veja se o NOVA OS tem novidades e instale com um clique.");
+    GtkWidget *g = group(p, "SEU SISTEMA");
+    char *v = up_version_text(); up_ver = lbl(v, "rval", 1); g_free(v);
+    row(g, "Versão instalada", NULL, up_ver);
+    up_check = btn_new("Verificar atualização", "accent", G_CALLBACK(on_up_check), NULL);
+    up_status = row(g, "Atualização do sistema", "Toque em Verificar para procurar novidades. É preciso internet.", up_check);
+    up_inst_grp = group(p, NULL); row(up_inst_grp, "Instalar a atualização", "Baixa e instala as novidades. Suas escolhas e arquivos são mantidos.", btn_new("Instalar", "accent", G_CALLBACK(on_up_install), NULL));
+    gtk_widget_set_no_show_all(up_inst_grp, TRUE); gtk_widget_hide(up_inst_grp);
+    up_wrap = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0); GtkWidget *cap = lbl("O QUE MUDA", "cap", 0); gtk_widget_set_margin_top(cap, 8); gtk_widget_set_margin_bottom(cap, 7); gtk_widget_set_margin_start(cap, 4);
+    gtk_box_pack_start(GTK_BOX(up_wrap), cap, FALSE, FALSE, 0);
+    up_changes = cls(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0), "group"); gtk_widget_set_margin_bottom(up_changes, 12); gtk_box_pack_start(GTK_BOX(up_wrap), up_changes, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(p), up_wrap, FALSE, FALSE, 0); gtk_widget_set_no_show_all(up_wrap, TRUE); gtk_widget_hide(up_wrap);
+    up_step = lbl("", "rsub", 0); gtk_widget_set_margin_top(up_step, 6); gtk_widget_set_no_show_all(up_step, TRUE); gtk_box_pack_start(GTK_BOX(p), up_step, FALSE, FALSE, 0);
+    up_bar = gtk_progress_bar_new(); gtk_widget_set_margin_top(up_bar, 6); gtk_widget_set_margin_bottom(up_bar, 12); gtk_widget_set_no_show_all(up_bar, TRUE); gtk_box_pack_start(GTK_BOX(p), up_bar, FALSE, FALSE, 0);
+    g = group(p, "AVISOS");
+    char *a = cfg("atualiza_aviso", "1");
+    row(g, "Avisar sobre novidades", "Ao ligar o computador, verifica (no máximo uma vez por dia) e mostra um aviso se houver atualização. Nunca instala sozinho.", sw_new(!strcmp(a, "1"), G_CALLBACK(on_up_aviso), NULL)); g_free(a);
+    return p;
+}
+
 /* ---------- Sobre ---------- */
 static GtkWidget *page_sobre(void) {
     GtkWidget *p = page_new("Sobre", "Informações deste computador.");
@@ -710,7 +832,7 @@ int main(int argc, char **argv) {
     }
     gtk_box_pack_start(GTK_BOX(side), list, FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(root), side, FALSE, FALSE, 0);
     stack = gtk_stack_new(); gtk_stack_set_transition_type(GTK_STACK(stack), GTK_STACK_TRANSITION_TYPE_SLIDE_UP_DOWN); gtk_stack_set_transition_duration(GTK_STACK(stack), 340);
-    GtkWidget *(*mk[NPAGES])(void) = { page_aparencia, page_papel, page_dock, page_tela, page_rede, page_seguranca, page_apps, page_atalhos, page_sobre };
+    GtkWidget *(*mk[NPAGES])(void) = { page_aparencia, page_papel, page_dock, page_tela, page_rede, page_seguranca, page_apps, page_atalhos, page_atualiza, page_sobre };
     for (int i = 0; i < NPAGES; i++) {
         GtkWidget *sw = gtk_scrolled_window_new(NULL, NULL); gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(sw), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
         gtk_container_add(GTK_CONTAINER(sw), mk[i]()); gtk_stack_add_named(GTK_STACK(stack), sw, PAGES[i]);

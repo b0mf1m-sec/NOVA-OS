@@ -1,0 +1,93 @@
+#!/bin/bash
+# Atualizações do NOVA OS a partir do repositório no GitHub.
+#   nova-atualizar verificar   imprime linhas chave=valor: estado=atual|nova|desconhecida|erro, instalada, disponivel, mudanca (várias)
+#   nova-atualizar instalar    baixa e instala a versão mais nova. A senha do administrador vem na 1ª linha da entrada padrão.
+#   nova-atualizar aviso       usado no início da sessão: verifica (no máximo a cada 12 h) e avisa por notificação
+# Testes: NOVA_PACOTE=arquivo.tar.gz usa um pacote local em vez de baixar; NOVA_SIMULA=1 não executa comandos de administrador.
+REPO="b0mf1m-sec/NOVA-OS"; API="https://api.github.com/repos/$REPO"
+D="$HOME/.local/share/nova"; VF="$D/versao"; EST="$D/atualizacao.estado"
+mkdir -p "$D"
+
+sha_ok() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+instalada() { local s; s=$(sed -n 1p "$VF" 2>/dev/null); sha_ok "$s" && echo "$s"; }
+
+# versão mais nova do ramo principal: imprime "SHA DATA"
+ultima() {
+  local j; j=$(curl -fsS --max-time 20 -H 'Accept: application/vnd.github+json' "$API/commits/main") || return 1
+  printf '%s' "$j" | python3 -I -c 'import sys,json; d=json.load(sys.stdin); print(d["sha"], d["commit"]["committer"]["date"][:10])' 2>/dev/null
+}
+
+verificar() {
+  local at nv dt r; at=$(instalada); r=$(ultima) || { echo "estado=erro"; echo "motivo=sem-internet"; return 1; }
+  nv=${r%% *}; dt=${r##* }; sha_ok "$nv" || { echo "estado=erro"; echo "motivo=resposta-invalida"; return 1; }
+  echo "disponivel=${nv:0:7}"; echo "data_disponivel=$dt"
+  [ -n "$at" ] && { echo "instalada=${at:0:7}"; echo "data_instalada=$(sed -n 2p "$VF")"; }
+  if [ "$at" = "$nv" ]; then echo "estado=atual"; return 0; fi
+  local c; c=$(curl -fsS --max-time 20 -H 'Accept: application/vnd.github+json' "$API/compare/${at:-x}...$nv" 2>/dev/null) || c=""
+  local msgs=""
+  if [ -n "$at" ] && [ -n "$c" ]; then
+    msgs=$(printf '%s' "$c" | python3 -I -c '
+import sys, json
+d = json.load(sys.stdin)
+if d.get("status") in ("behind", "identical"): print("#ATUAL"); sys.exit()
+for k in reversed(d.get("commits", [])): print(k["commit"]["message"].split("\n")[0])' 2>/dev/null)
+    if [ "$msgs" = "#ATUAL" ]; then echo "estado=atual"; return 0; fi    # esta cópia está à frente do GitHub: nada a instalar
+  fi
+  if [ -z "$msgs" ]; then      # versão instalada desconhecida: mostra só a última novidade
+    msgs=$(curl -fsS --max-time 20 -H 'Accept: application/vnd.github+json' "$API/commits/$nv" 2>/dev/null | python3 -I -c 'import sys,json; print(json.load(sys.stdin)["commit"]["message"].split("\n")[0])' 2>/dev/null)
+  fi
+  [ -n "$at" ] && echo "estado=nova" || echo "estado=desconhecida"
+  printf '%s\n' "$msgs" | while IFS= read -r m; do [ -n "$m" ] && echo "mudanca=$m"; done
+  return 0
+}
+
+instalar() {
+  IFS= read -r SEN
+  local W ASK
+  W=$(mktemp -d "${XDG_RUNTIME_DIR:-$HOME/.cache}/nova-atualizacao.XXXXXX") || { echo "ERRO: sem espaço para trabalhar"; exit 1; }
+  chmod 700 "$W"
+  trap 'rm -rf "$W"' EXIT
+  # a senha fica só num arquivo temporário (somente seu) para o sudo ler; é apagada ao terminar
+  printf '%s\n' "$SEN" > "$W/senha"; chmod 600 "$W/senha"; unset SEN
+  ASK="$W/askpass"; printf '#!/bin/sh\ncat "%s"\n' "$W/senha" > "$ASK"; chmod 700 "$ASK"
+  export SUDO_ASKPASS="$ASK"
+  if [ -z "$NOVA_SIMULA" ]; then
+    echo "ETAPA: Conferindo a senha"
+    sudo -A -k true 2>/dev/null || { echo "ERRO: senha incorreta"; exit 3; }
+  fi
+  local nv dt r
+  if [ -n "$NOVA_PACOTE" ]; then nv=$(sed -n 1p "$NOVA_PACOTE.versao" 2>/dev/null); dt=$(sed -n 2p "$NOVA_PACOTE.versao" 2>/dev/null)
+  else
+    echo "ETAPA: Procurando a versão mais nova"
+    r=$(ultima) || { echo "ERRO: sem internet"; exit 4; }; nv=${r%% *}; dt=${r##* }
+  fi
+  sha_ok "$nv" || { echo "ERRO: resposta inválida do servidor"; exit 4; }
+  mkdir -p "$W/novo"
+  if [ -n "$NOVA_PACOTE" ]; then cp "$NOVA_PACOTE" "$W/pacote.tar.gz"
+  else
+    echo "ETAPA: Baixando a atualização"
+    curl -fL --max-time 600 -o "$W/pacote.tar.gz" "https://codeload.github.com/$REPO/tar.gz/$nv" || { echo "ERRO: falha ao baixar (internet instável?)"; exit 4; }
+  fi
+  echo "ETAPA: Conferindo o pacote"
+  tar -xzf "$W/pacote.tar.gz" -C "$W/novo" --strip-components=1 --no-same-owner 2>/dev/null || { echo "ERRO: pacote corrompido"; exit 5; }
+  [ -f "$W/novo/install.sh" ] && [ -d "$W/novo/fontes" ] && bash -n "$W/novo/install.sh" || { echo "ERRO: pacote inválido"; exit 5; }
+  printf '%s\n%s\n' "$nv" "${dt:-$(date +%F)}" > "$W/novo/VERSAO"
+  echo "ETAPA: Instalando (pode levar alguns minutos; não desligue o computador)"
+  bash "$W/novo/install.sh" --atualizar --sim 2>&1 || { echo "ERRO: a instalação não terminou. Nada foi perdido; tente de novo. Detalhes: $D/instalacao.log"; exit 6; }
+  echo "OK: concluida"
+}
+
+aviso() {
+  [ "$("$HOME/.local/bin/nova-config" -g atualiza_aviso 1)" = 1 ] || exit 0
+  local agora ult av out; agora=$(date +%s); ult=$(sed -n 's/^verificado=//p' "$EST" 2>/dev/null)
+  [ -n "$ult" ] && [ $((agora - ${ult:-0})) -lt 43200 ] && exit 0
+  out=$(verificar) || { exit 0; }
+  av=$(sed -n 's/^avisado=//p' "$EST" 2>/dev/null); local nv; nv=$(sed -n 's/^disponivel=//p' <<<"$out")
+  printf 'verificado=%s\navisado=%s\n' "$agora" "$av" > "$EST"
+  if grep -q '^estado=\(nova\|desconhecida\)' <<<"$out" && [ "$nv" != "$av" ]; then
+    notify-send -i system-software-update "Atualização do NOVA OS disponível" "Abra Ajustes → Atualizações para ver as novidades e instalar." 2>/dev/null
+    printf 'verificado=%s\navisado=%s\n' "$agora" "$nv" > "$EST"
+  fi
+}
+
+case "$1" in verificar) verificar;; instalar) instalar;; aviso) aviso;; *) echo "uso: nova-atualizar verificar|instalar|aviso"; exit 2;; esac
