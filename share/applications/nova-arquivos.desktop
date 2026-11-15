@@ -2,7 +2,7 @@
 Type=Application
 Name=Arquivos
 Comment=Gerenciador de arquivos
-Exec=pcmanfm %U
+Exec=@HOME@/.local/bin/nova-discos %U
 Icon=@HOME@/.local/share/nova/icons/arquivos.png
 Terminal=false
 StartupWMClass=Pcmanfm
@@ -13,4 +13,4 @@ Actions=nova-janela;
 
 [Desktop Action nova-janela]
 Name=Abrir nova janela
-Exec=pcmanfm %U
+Exec=@HOME@/.local/bin/nova-discos %U

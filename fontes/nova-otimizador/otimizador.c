@@ -191,7 +191,50 @@ static void fill_rows(Row *rows, int nrows, GList *l, long min_kb) {
     for (; i < nrows; i++) gtk_widget_hide(rows[i].box);
 }
 
+/* ---------- velocidade da rede ---------- */
+static GtkWidget *net_down, *net_up, *net_down_sub, *net_info;
+static guint64 net_rx0, net_tx0; static gint64 net_t0; static int net_ticks;
+static void read_net(guint64 *rx, guint64 *tx) {
+    *rx = *tx = 0; char *s = NULL; if (!g_file_get_contents("/proc/net/dev", &s, NULL, NULL)) return;
+    char **ln = g_strsplit(s, "\n", -1);
+    for (char **p = ln + 2; *p && **p; p++) {
+        char *c = strchr(*p, ':'); if (!c) continue; *c = 0; const char *nm = *p; while (*nm == ' ') nm++;
+        if (!strcmp(nm, "lo") || g_str_has_prefix(nm, "veth") || g_str_has_prefix(nm, "docker") || g_str_has_prefix(nm, "br-")) continue;
+        guint64 r = 0, t = 0; unsigned long long v[16] = { 0 };
+        if (sscanf(c + 1, "%llu %*u %*u %*u %*u %*u %*u %*u %llu", &v[0], &v[8]) == 2) { r = v[0]; t = v[8]; }
+        *rx += r; *tx += t;
+    }
+    g_strfreev(ln); g_free(s);
+}
+static void fmt_rate(double bps, char *out, size_t n) {
+    if (bps < 1024) g_snprintf(out, n, "%.0f B/s", bps);
+    else if (bps < 1048576) g_snprintf(out, n, "%.0f KB/s", bps / 1024);
+    else g_snprintf(out, n, "%.1f MB/s", bps / 1048576);
+}
+static void net_info_refresh(void) {
+    char *o = nova_sh("d=$(ip route show default 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i==\"dev\"){print $(i+1); exit}}'); [ -n \"$d\" ] || exit 0;"
+        " if [ -d /sys/class/net/$d/wireless ]; then LC_ALL=C nmcli -t -f ACTIVE,SSID,RATE dev wifi 2>/dev/null | awk -F: '$1==\"yes\"{print \"wifi|\"$2\"|\"$3; exit}';"
+        " else echo \"cabo||$(cat /sys/class/net/$d/speed 2>/dev/null) Mbit/s\"; fi");
+    char **f = g_strsplit(o, "|", 3); char *t;
+    if (!f[0] || !f[1] || !f[2]) t = g_strdup("Sem conexão com a internet");
+    else if (!strcmp(f[0], "wifi")) t = g_strdup_printf("Wi-Fi · %s · conexão de até %s", f[1], f[2]);
+    else t = g_strdup_printf("Cabo de rede · conexão de até %s", f[2]);
+    gtk_label_set_text(GTK_LABEL(net_info), t); g_free(t); g_strfreev(f); g_free(o);
+}
+static void net_update(void) {
+    guint64 rx, tx; read_net(&rx, &tx); gint64 now = g_get_monotonic_time();
+    if (net_t0) {
+        double dt = (now - net_t0) / 1e6; if (dt < .2) return;
+        double d = rx >= net_rx0 ? (rx - net_rx0) / dt : 0, u = tx >= net_tx0 ? (tx - net_tx0) / dt : 0; char a[32], b[32], c[48];
+        fmt_rate(d, a, sizeof a); fmt_rate(u, b, sizeof b);
+        gtk_label_set_text(GTK_LABEL(net_down), a); gtk_label_set_text(GTK_LABEL(net_up), b);
+        g_snprintf(c, sizeof c, "%.1f Mbps", d * 8 / 1e6); gtk_label_set_text(GTK_LABEL(net_down_sub), c);
+    }
+    net_rx0 = rx; net_tx0 = tx; net_t0 = now;
+    if (net_ticks++ % 8 == 0) net_info_refresh();
+}
 static gboolean tick_data(gpointer d) {
+    net_update();
     sample_mem(); sample_cpu();
     GList *l = scan(NULL, 0);
     l = g_list_sort(l, cmp_mem); fill_rows(heavy, NHEAVY, l, 30 * 1024);
@@ -402,6 +445,18 @@ int main(int argc, char **argv) {
     heavy_empty = lbl("Nenhum programa pesado aberto.", "vazio", .5); gtk_widget_set_margin_top(heavy_empty, 10); gtk_widget_set_margin_bottom(heavy_empty, 10);
     gtk_box_pack_start(GTK_BOX(hp), heavy_empty, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(right), hp, FALSE, FALSE, 0);
+    GtkWidget *np = cls(gtk_box_new(GTK_ORIENTATION_VERTICAL, 4), "glasspanel"); gtk_widget_set_margin_top(np, 12);
+    gtk_box_pack_start(GTK_BOX(np), lbl("REDE AGORA", "colh", 0), FALSE, FALSE, 2);
+    GtkWidget *nr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10); gtk_box_set_homogeneous(GTK_BOX(nr), TRUE);
+    GtkWidget *nd = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0), *nu = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    net_down = lbl("—", "tval", 0); net_up = lbl("—", "tval", 0); net_down_sub = lbl("", "tsub", 0); net_info = lbl("…", "tsub", 0);
+    gtk_box_pack_start(GTK_BOX(nd), lbl("↓ BAIXANDO", "colh", 0), FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(nd), net_down, FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(nd), net_down_sub, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(nu), lbl("↑ ENVIANDO", "colh", 0), FALSE, FALSE, 0); gtk_box_pack_start(GTK_BOX(nu), net_up, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(nr), nd, TRUE, TRUE, 0); gtk_box_pack_start(GTK_BOX(nr), nu, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(np), nr, FALSE, FALSE, 0);
+    gtk_label_set_ellipsize(GTK_LABEL(net_info), PANGO_ELLIPSIZE_END); gtk_widget_set_margin_top(net_info, 4);
+    gtk_box_pack_start(GTK_BOX(np), net_info, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(right), np, FALSE, FALSE, 0);
     GtkWidget *lv = cls(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 14), "glasspanel"); gtk_widget_set_margin_top(lv, 12);
     GtkWidget *lt = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2); gtk_widget_set_margin_top(lt, 6); gtk_widget_set_margin_bottom(lt, 6);
     GtkWidget *ls = lbl("Desliga animações, efeitos e tarefas de fundo. O computador fica mais leve.", "sub", 0);
@@ -451,7 +506,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < NPROC; i++) { gtk_widget_set_no_show_all(procs[i].box, TRUE); gtk_widget_hide(procs[i].box); }
     gboolean mon = argc > 1 && !strcmp(argv[1], "--monitor");
     on_seg(NULL, GINT_TO_POINTER(mon ? 1 : 0)); on_sort(NULL, GINT_TO_POINTER(1));
-    g_timeout_add(2000, tick_data, NULL);
+    net_update(); g_timeout_add(2000, tick_data, NULL);
     if (!mon && !g_getenv("NOVA_OTIMIZADOR_MANUAL")) g_timeout_add(700, auto_start, NULL);
     gtk_main();
     return 0;

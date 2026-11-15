@@ -226,25 +226,230 @@ static GtkWidget *page_tela(void) {
 }
 
 /* ---------- Rede ---------- */
-static GtkWidget *wifi_sub;
+static GtkWidget *wifi_sub, *wifi_list, *eth_sub, *eth_ctl;
+static gboolean net_busy, net_scanning;
+
+typedef void (*RunDone)(gboolean ok, const char *out, gpointer data);
+typedef struct { RunDone cb; gpointer data; } RunCtx;
+static void run_done(GObject *src, GAsyncResult *res, gpointer d) {
+    RunCtx *c = d; char *so = NULL, *se = NULL;
+    gboolean ok = g_subprocess_communicate_utf8_finish(G_SUBPROCESS(src), res, &so, &se, NULL) && g_subprocess_get_successful(G_SUBPROCESS(src));
+    char *msg = g_strconcat(so ? so : "", se ? se : "", NULL);
+    if (c->cb) c->cb(ok, msg, c->data);
+    g_free(msg); g_free(so); g_free(se); g_object_unref(src); g_free(c);
+}
+// Roda um programa sem passar por shell (nome de rede e senha nunca são interpretados como comando).
+static void run_async(const char *const *argv, const char *input, RunDone cb, gpointer data) {
+    GSubprocessLauncher *l = g_subprocess_launcher_new(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE | (input ? G_SUBPROCESS_FLAGS_STDIN_PIPE : 0));
+    g_subprocess_launcher_setenv(l, "LC_ALL", "C", TRUE);
+    GSubprocess *p = g_subprocess_launcher_spawnv(l, argv, NULL); g_object_unref(l);
+    if (!p) { if (cb) cb(FALSE, "", data); return; }
+    RunCtx *c = g_new(RunCtx, 1); c->cb = cb; c->data = data;
+    g_subprocess_communicate_utf8_async(p, input, NULL, run_done, c);
+}
+static void run_sync(const char *const *argv) { g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL, NULL, NULL); }
+
+static gboolean wifi_on(void) { char *r = nova_sh("LC_ALL=C nmcli radio wifi 2>/dev/null"); gboolean on = g_str_has_prefix(r, "enabled"); g_free(r); return on; }
+static gboolean wifi_present(void) { char *r = nova_sh("LC_ALL=C nmcli -t -f TYPE dev 2>/dev/null | grep -x wifi"); gboolean p = *r; g_free(r); return p; }
+
+/* --- cabo --- */
+static void eth_refresh(void) {
+    char *o = nova_sh("LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | awk -F: '$2==\"ethernet\"{print $1\" \"$3; exit}'");
+    char *dev = g_strdup(o), *st = strchr(dev, ' '); if (st) *st++ = 0; else st = (char *)"";
+    char *t = NULL; const char *acao = NULL, *rot = NULL;
+    if (!*o) t = g_strdup("Este computador não tem entrada para cabo de rede");
+    else if (g_str_has_prefix(st, "connected")) {
+        char *c = g_strdup_printf("LC_ALL=C nmcli -g IP4.ADDRESS dev show %s 2>/dev/null | head -1 | cut -d/ -f1", dev), *ip = nova_sh(c);
+        t = g_strdup_printf("Conectado por cabo · endereço %s", *ip ? ip : "—"); acao = "disconnect"; rot = "Desconectar"; g_free(c); g_free(ip);
+    } else if (g_str_has_prefix(st, "connecting")) t = g_strdup("Conectando…");
+    else if (g_str_has_prefix(st, "unavailable")) t = g_strdup("Nenhum cabo ligado. Conecte o cabo de rede no computador.");
+    else { t = g_strdup("Cabo ligado, mas sem conexão"); acao = "connect"; rot = "Conectar"; }
+    gtk_label_set_text(GTK_LABEL(eth_sub), t);
+    if (acao) { gtk_button_set_label(GTK_BUTTON(eth_ctl), rot); g_object_set_data_full(G_OBJECT(eth_ctl), "acao", g_strdup(acao), g_free); g_object_set_data_full(G_OBJECT(eth_ctl), "dev", g_strdup(dev), g_free); }
+    gtk_widget_set_visible(eth_ctl, acao != NULL);
+    g_free(t); g_free(dev); g_free(o);
+}
+static gboolean eth_later(gpointer d) { eth_refresh(); return G_SOURCE_REMOVE; }
+static void on_eth(GtkWidget *w, gpointer d) {
+    const char *a = g_object_get_data(G_OBJECT(w), "acao"), *dev = g_object_get_data(G_OBJECT(w), "dev");
+    if (!a || !dev) return;
+    const char *argv[] = { "nmcli", "dev", a, dev, NULL }; run_async(argv, NULL, NULL, NULL);
+    gtk_label_set_text(GTK_LABEL(eth_sub), "Aguarde…"); g_timeout_add(3000, eth_later, NULL);
+}
+
+/* --- Wi-Fi --- */
 static void wifi_refresh(void) {
+    if (!wifi_present()) { gtk_label_set_text(GTK_LABEL(wifi_sub), "Este computador não tem Wi-Fi"); return; }
+    if (!wifi_on()) { gtk_label_set_text(GTK_LABEL(wifi_sub), "Desligado"); return; }
     char *o = nova_sh("LC_ALL=C nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null | awk -F: '$1==\"yes\"{print $2; exit}'"), *ip = nova_sh("hostname -I | awk '{print $1}'");
-    char *t = *o ? g_strdup_printf("Conectado a \"%s\" · endereço %s", o, *ip ? ip : "—") : g_strdup("Sem conexão");
+    char *t = *o ? g_strdup_printf("Conectado a \"%s\" · endereço %s", o, *ip ? ip : "—") : g_strdup("Sem conexão. Escolha uma rede na lista abaixo.");
     gtk_label_set_text(GTK_LABEL(wifi_sub), t); g_free(t); g_free(o); g_free(ip);
 }
-static gboolean wifi_later(gpointer d) { wifi_refresh(); return G_SOURCE_REMOVE; }
-static void on_wifi(GObject *s, GParamSpec *p, gpointer d) { if (loading) return; nova_sh(gtk_switch_get_active(GTK_SWITCH(s)) ? "nmcli radio wifi on" : "nmcli radio wifi off"); g_timeout_add(4000, wifi_later, NULL); wifi_refresh(); }
+static void wifi_scan(gboolean force);
+static gboolean wifi_later(gpointer d) { wifi_refresh(); wifi_scan(TRUE); return G_SOURCE_REMOVE; }
+
+typedef struct { char *ssid, *sec; int sig; gboolean use; } Net;
+static void net_free(gpointer p) { Net *n = p; g_free(n->ssid); g_free(n->sec); g_free(n); }
+static gint net_cmp(gconstpointer a, gconstpointer b) {
+    const Net *x = *(Net *const *)a, *y = *(Net *const *)b;
+    if (x->use != y->use) return y->use - x->use; return y->sig - x->sig;
+}
+static char *unesc(const char *s) {           // nmcli -t escreve ":" e "\" com barra invertida
+    GString *g = g_string_new(NULL);
+    for (; *s; s++) { if (*s == '\\' && s[1]) s++; g_string_append_c(g, *s); }
+    return g_string_free(g, FALSE);
+}
+static gboolean net_aberta(const char *sec) { return !*sec || !strcmp(sec, "--"); }
+
+static void clear_list(void) { gtk_container_foreach(GTK_CONTAINER(wifi_list), (GtkCallback)gtk_widget_destroy, NULL); }
+static void info_row(const char *t, const char *s) { clear_list(); row(wifi_list, t, s, NULL); gtk_widget_show_all(wifi_list); }
+
+static void msg_box(const char *title, const char *text) {
+    GtkWidget *dlg = gtk_message_dialog_new(GTK_WINDOW(win), GTK_DIALOG_MODAL, GTK_MESSAGE_INFO, GTK_BUTTONS_OK, "%s", title);
+    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dlg), "%s", text); gtk_dialog_run(GTK_DIALOG(dlg)); gtk_widget_destroy(dlg);
+}
+static void on_pw_changed(GtkEditable *e, gpointer dlg) { gtk_dialog_set_response_sensitive(GTK_DIALOG(dlg), GTK_RESPONSE_OK, strlen(gtk_entry_get_text(GTK_ENTRY(e))) >= 8); }
+static void on_pw_show(GtkToggleButton *t, gpointer entry) { gtk_entry_set_visibility(GTK_ENTRY(entry), gtk_toggle_button_get_active(t)); }
+static char *ask_password(const char *ssid, const char *aviso) {
+    GtkWidget *dlg = gtk_dialog_new_with_buttons("Conectar ao Wi-Fi", GTK_WINDOW(win), GTK_DIALOG_MODAL, "Cancelar", GTK_RESPONSE_CANCEL, "Conectar", GTK_RESPONSE_OK, NULL);
+    GtkWidget *box = gtk_dialog_get_content_area(GTK_DIALOG(dlg)); gtk_container_set_border_width(GTK_CONTAINER(box), 18); gtk_box_set_spacing(GTK_BOX(box), 10);
+    char *t = g_strdup_printf("Digite a senha da rede \"%s\"", ssid);
+    gtk_box_pack_start(GTK_BOX(box), lbl(t, "rtitle", 0), FALSE, FALSE, 0); g_free(t);
+    if (aviso) gtk_box_pack_start(GTK_BOX(box), lbl(aviso, "rsub", 0), FALSE, FALSE, 0);
+    GtkWidget *en = gtk_entry_new(); gtk_entry_set_visibility(GTK_ENTRY(en), FALSE); gtk_entry_set_activates_default(GTK_ENTRY(en), TRUE); gtk_widget_set_size_request(en, 300, -1);
+    gtk_entry_set_placeholder_text(GTK_ENTRY(en), "Senha do Wi-Fi (mínimo 8 caracteres)");
+    gtk_box_pack_start(GTK_BOX(box), en, FALSE, FALSE, 0);
+    GtkWidget *ck = gtk_check_button_new_with_label("Mostrar senha"); g_signal_connect(ck, "toggled", G_CALLBACK(on_pw_show), en);
+    gtk_box_pack_start(GTK_BOX(box), ck, FALSE, FALSE, 0);
+    gtk_dialog_set_default_response(GTK_DIALOG(dlg), GTK_RESPONSE_OK); gtk_dialog_set_response_sensitive(GTK_DIALOG(dlg), GTK_RESPONSE_OK, FALSE);
+    g_signal_connect(en, "changed", G_CALLBACK(on_pw_changed), dlg);
+    gtk_widget_show_all(dlg); gtk_widget_grab_focus(en);
+    char *pw = gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK ? g_strdup(gtk_entry_get_text(GTK_ENTRY(en))) : NULL;
+    gtk_widget_destroy(dlg); return pw;
+}
+
+typedef struct { char *ssid, *prev, *senha; } Conn;
+static void conn_free(Conn *c) { if (c->senha) { memset(c->senha, 0, strlen(c->senha)); g_free(c->senha); } g_free(c->ssid); g_free(c->prev); g_free(c); }
+static void wifi_connect(const char *ssid, const char *senha);
+static void conn_done(gboolean ok, const char *out, gpointer d) {
+    Conn *c = d; net_busy = FALSE;
+    if (!ok) {   // limpa o perfil criado com senha errada e volta para a rede que estava ligada
+        const char *del[] = { "nmcli", "con", "delete", "id", c->ssid, NULL }; run_sync(del);
+        if (c->prev && *c->prev) { const char *up[] = { "nmcli", "con", "up", "id", c->prev, NULL }; run_async(up, NULL, NULL, NULL); }
+        if (strstr(out, "ecret") || strstr(out, "assword") || strstr(out, "802-1x")) msg_box("Senha incorreta", "A senha não foi aceita pela rede. Confira e tente de novo.");
+        else if (strstr(out, "No network")) msg_box("Rede não encontrada", "A rede está fora de alcance. Chegue mais perto do roteador e tente de novo.");
+        else msg_box("Não foi possível conectar", "Tente de novo em alguns instantes. Se continuar, reinicie o roteador.");
+    }
+    conn_free(c); wifi_refresh(); wifi_scan(TRUE);
+}
+static void wifi_connect(const char *ssid, const char *senha) {
+    if (net_busy) return; net_busy = TRUE;
+    Conn *c = g_new0(Conn, 1); c->ssid = g_strdup(ssid); c->senha = senha ? g_strdup_printf("%s\n", senha) : NULL;
+    c->prev = nova_sh("LC_ALL=C nmcli -t -f NAME,TYPE con show --active 2>/dev/null | awk -F: '$2==\"802-11-wireless\"{print $1; exit}'");
+    char *t = g_strdup_printf("Conectando a \"%s\"…", ssid); gtk_label_set_text(GTK_LABEL(wifi_sub), t); g_free(t);
+    const char *a1[] = { "nmcli", "-w", "30", "--ask", "dev", "wifi", "connect", ssid, NULL }, *a2[] = { "nmcli", "-w", "30", "dev", "wifi", "connect", ssid, NULL };
+    run_async(senha ? a1 : a2, c->senha, conn_done, c);
+}
+static void saved_done(gboolean ok, const char *out, gpointer d) {
+    Conn *c = d; net_busy = FALSE;
+    if (!ok && (strstr(out, "ecret") || strstr(out, "assword"))) {      // senha salva não vale mais: pede de novo
+        char *pw = ask_password(c->ssid, "A senha salva não funcionou. Ela pode ter sido trocada.");
+        if (pw) { const char *del[] = { "nmcli", "con", "delete", "id", c->ssid, NULL }; run_sync(del); wifi_connect(c->ssid, pw); memset(pw, 0, strlen(pw)); g_free(pw); }
+    } else if (!ok) msg_box("Não foi possível conectar", "A rede pode estar fora de alcance. Chegue mais perto do roteador e tente de novo.");
+    conn_free(c); wifi_refresh(); wifi_scan(TRUE);
+}
+static void on_net_click(GtkWidget *w, gpointer d) {
+    if (net_busy) return;
+    const char *ssid = g_object_get_data(G_OBJECT(w), "ssid"), *sec = g_object_get_data(G_OBJECT(w), "sec");
+    gboolean use = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(w), "use")), saved = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(w), "saved"));
+    if (use) {
+        char *dev = nova_sh("LC_ALL=C nmcli -t -f DEVICE,TYPE dev | awk -F: '$2==\"wifi\"{print $1; exit}'");
+        const char *a[] = { "nmcli", "dev", "disconnect", dev, NULL }; run_sync(a); g_free(dev);
+        g_timeout_add(1500, wifi_later, NULL); return;
+    }
+    if (saved) {
+        net_busy = TRUE; Conn *c = g_new0(Conn, 1); c->ssid = g_strdup(ssid);
+        char *t = g_strdup_printf("Conectando a \"%s\"…", ssid); gtk_label_set_text(GTK_LABEL(wifi_sub), t); g_free(t);
+        const char *a[] = { "nmcli", "-w", "30", "con", "up", "id", ssid, NULL }; run_async(a, NULL, saved_done, c); return;
+    }
+    if (net_aberta(sec)) { wifi_connect(ssid, NULL); return; }
+    if (strstr(sec, "802.1X") && !strstr(sec, "WPA-PSK") && !strstr(sec, "WPA2 ") && strcmp(sec, "WPA2") && strcmp(sec, "WPA1 WPA2")) {
+        msg_box("Rede corporativa", "Esta rede exige usuário e senha especiais. Vai abrir a janela de configuração avançada."); nova_spawn("nm-connection-editor"); return;
+    }
+    char *pw = ask_password(ssid, NULL);
+    if (pw) { wifi_connect(ssid, pw); memset(pw, 0, strlen(pw)); g_free(pw); }
+}
+static void on_net_forget(GtkWidget *w, gpointer d) {
+    const char *ssid = g_object_get_data(G_OBJECT(w), "ssid"); const char *a[] = { "nmcli", "con", "delete", "id", ssid, NULL }; run_sync(a); wifi_scan(TRUE);
+}
+static void net_list_fill(const char *out) {
+    GHashTable *seen = g_hash_table_new(g_str_hash, g_str_equal); GPtrArray *arr = g_ptr_array_new_with_free_func(net_free);
+    char **ln = g_strsplit(out, "\n", -1);
+    for (char **p = ln; *p; p++) {
+        char *l = *p; char *c3 = strrchr(l, ':'); if (!c3) continue; *c3 = 0;
+        char *c2 = strrchr(l, ':'); if (!c2) continue; *c2 = 0;
+        char *c1 = strchr(l, ':'); if (!c1) continue; *c1 = 0;
+        char *ssid = unesc(c1 + 1); if (!*ssid) { g_free(ssid); continue; }
+        int sig = atoi(c2 + 1); gboolean use = l[0] == '*'; Net *n = g_hash_table_lookup(seen, ssid);
+        if (n) { if (sig > n->sig) { n->sig = sig; g_free(n->sec); n->sec = g_strdup(c3 + 1); } n->use |= use; g_free(ssid); continue; }
+        n = g_new0(Net, 1); n->ssid = ssid; n->sig = sig; n->use = use; n->sec = g_strdup(c3 + 1); g_ptr_array_add(arr, n); g_hash_table_insert(seen, n->ssid, n);
+    }
+    g_strfreev(ln); g_hash_table_destroy(seen); g_ptr_array_sort(arr, net_cmp);
+    char *sv = nova_sh("LC_ALL=C nmcli -t -f NAME,TYPE con show 2>/dev/null | awk -F: '$2==\"802-11-wireless\"{print $1}'"); char **saved = g_strsplit(sv, "\n", -1); g_free(sv);
+    clear_list();
+    if (!arr->len) row(wifi_list, "Nenhuma rede encontrada", "Chegue mais perto do roteador e toque em Atualizar.", NULL);
+    for (guint i = 0; i < arr->len && i < 15; i++) {
+        Net *n = arr->pdata[i]; gboolean sv_ = g_strv_contains((const gchar *const *)saved, n->ssid);
+        const char *sinal = n->sig >= 70 ? "sinal forte" : n->sig >= 40 ? "sinal médio" : "sinal fraco";
+        char *s = g_strdup_printf("%s%s · %s%s", n->use ? "Conectado · " : "", sinal, net_aberta(n->sec) ? "aberta (sem senha)" : "protegida por senha", sv_ && !n->use ? " · salva" : "");
+        GtkWidget *hb = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+        if (sv_ && !n->use) { GtkWidget *f = btn_new("Esquecer", "soft", G_CALLBACK(on_net_forget), NULL); g_object_set_data_full(G_OBJECT(f), "ssid", g_strdup(n->ssid), g_free); gtk_box_pack_start(GTK_BOX(hb), f, FALSE, FALSE, 0); }
+        GtkWidget *b = btn_new(n->use ? "Desconectar" : "Conectar", n->use ? "soft" : "accent", G_CALLBACK(on_net_click), NULL);
+        g_object_set_data_full(G_OBJECT(b), "ssid", g_strdup(n->ssid), g_free); g_object_set_data_full(G_OBJECT(b), "sec", g_strdup(n->sec), g_free);
+        g_object_set_data(G_OBJECT(b), "use", GINT_TO_POINTER(n->use)); g_object_set_data(G_OBJECT(b), "saved", GINT_TO_POINTER(sv_));
+        gtk_box_pack_start(GTK_BOX(hb), b, FALSE, FALSE, 0);
+        row(wifi_list, n->ssid, s, hb); g_free(s);
+    }
+    g_strfreev(saved); g_ptr_array_free(arr, TRUE); gtk_widget_show_all(wifi_list);
+}
+static void rede_scan_done(gboolean ok, const char *out, gpointer d) { net_scanning = FALSE; if (!net_busy) net_list_fill(out); }
+static void wifi_scan(gboolean force) {
+    if (net_scanning || net_busy || !wifi_list) return;
+    if (!wifi_present()) { info_row("Sem Wi-Fi", "Este computador não tem placa de Wi-Fi."); return; }
+    if (!wifi_on()) { info_row("O Wi-Fi está desligado", "Ligue o interruptor “Wi-Fi” acima para ver as redes."); return; }
+    net_scanning = TRUE;
+    const char *a[] = { "nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", force ? "yes" : "auto", NULL }; run_async(a, NULL, rede_scan_done, NULL);
+}
+static void on_rescan(GtkWidget *w, gpointer d) { wifi_scan(TRUE); }
+static void on_wifi(GObject *s, GParamSpec *p, gpointer d) {
+    if (loading) return;
+    nova_sh(gtk_switch_get_active(GTK_SWITCH(s)) ? "nmcli radio wifi on" : "nmcli radio wifi off");
+    wifi_refresh(); if (!gtk_switch_get_active(GTK_SWITCH(s))) wifi_scan(FALSE); else info_row("Procurando redes…", NULL);
+    g_timeout_add(3500, wifi_later, NULL);
+}
+static gboolean net_tick(gpointer d) {
+    const char *v = gtk_stack_get_visible_child_name(GTK_STACK(stack));
+    if (v && !strcmp(v, PAGES[4]) && gtk_window_is_active(GTK_WINDOW(win))) { eth_refresh(); wifi_refresh(); wifi_scan(FALSE); }
+    return G_SOURCE_CONTINUE;
+}
+static void net_page_shown(GObject *o, GParamSpec *p, gpointer d) {
+    const char *v = gtk_stack_get_visible_child_name(GTK_STACK(stack));
+    if (v && !strcmp(v, PAGES[4])) { eth_refresh(); wifi_refresh(); wifi_scan(TRUE); }
+}
 static void on_bt(GObject *s, GParamSpec *p, gpointer d) {
     if (loading) return;
     nova_sh(gtk_switch_get_active(GTK_SWITCH(s)) ? "rfkill unblock bluetooth 2>/dev/null; sudo -n /usr/local/sbin/nova-admin bt-on; (blueman-applet >/dev/null 2>&1 &)"
                                                   : "sudo -n /usr/local/sbin/nova-admin bt-off; rfkill block bluetooth 2>/dev/null; pkill -x blueman-applet");
 }
 static GtkWidget *page_rede(void) {
-    GtkWidget *p = page_new("Rede e Bluetooth", "Conexão com a internet e com aparelhos sem fio.");
-    GtkWidget *g = group(p, "WI-FI");
-    char *r = nova_sh("LC_ALL=C nmcli radio wifi 2>/dev/null");
-    wifi_sub = row(g, "Wi-Fi", "…", sw_new(g_str_has_prefix(r, "enabled"), G_CALLBACK(on_wifi), NULL)); g_free(r); wifi_refresh();
-    row(g, "Escolher outra rede", "Abre a lista de redes; também dá para clicar no ícone de Wi-Fi na barra", btn_new("Abrir…", "soft", G_CALLBACK(on_run), "nm-connection-editor"));
+    GtkWidget *p = page_new("Rede e Bluetooth", "Escolha como se conectar à internet: por cabo de rede ou por Wi-Fi.");
+    GtkWidget *g = group(p, "CABO DE REDE");
+    eth_ctl = btn_new("Conectar", "soft", G_CALLBACK(on_eth), NULL); gtk_widget_set_no_show_all(eth_ctl, TRUE);
+    eth_sub = row(g, "Cabo (Ethernet)", "…", eth_ctl); eth_refresh();
+    g = group(p, "WI-FI");
+    wifi_sub = row(g, "Wi-Fi", "…", sw_new(wifi_on(), G_CALLBACK(on_wifi), NULL)); wifi_refresh();
+    row(g, "Redes ao redor", "Procura de novo as redes disponíveis", btn_new("Atualizar", "soft", G_CALLBACK(on_rescan), NULL));
+    wifi_list = group(p, "REDES DISPONÍVEIS"); row(wifi_list, "Procurando redes…", NULL, NULL);
     g = group(p, "BLUETOOTH");
     char *b = nova_sh("systemctl is-active bluetooth 2>/dev/null");
     row(g, "Bluetooth", "Fones, caixas de som, mouse e teclado sem fio", sw_new(!strcmp(b, "active"), G_CALLBACK(on_bt), NULL)); g_free(b);
@@ -511,6 +716,7 @@ int main(int argc, char **argv) {
         gtk_container_add(GTK_CONTAINER(sw), mk[i]()); gtk_stack_add_named(GTK_STACK(stack), sw, PAGES[i]);
     }
     gtk_box_pack_start(GTK_BOX(root), stack, TRUE, TRUE, 0);
+    g_signal_connect(stack, "notify::visible-child-name", G_CALLBACK(net_page_shown), NULL); g_timeout_add_seconds(15, net_tick, NULL);
     g_signal_connect(list, "row-selected", G_CALLBACK(on_page), NULL);
     gtk_widget_show_all(win);
     gtk_stack_set_transition_type(GTK_STACK(stack), GTK_STACK_TRANSITION_TYPE_NONE);

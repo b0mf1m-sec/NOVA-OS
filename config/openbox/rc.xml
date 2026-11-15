@@ -226,7 +226,7 @@
   </keybind>
 
   <!-- Keybindings for running applications -->
-  <keybind key="W-e"><action name="Execute"><command>pcmanfm</command></action></keybind>
+  <keybind key="W-e"><action name="Execute"><command>@HOME@/.local/bin/nova-discos</command></action></keybind>
   <!-- Launch scrot when Print is pressed -->
   <keybind key="Print">
     <action name="Execute"><command>flameshot gui</command></action>
