@@ -2,7 +2,7 @@
 # Compila os apps do NOVA OS e instala em ~/.local/bin.  Uso: compilar [app ...]   (sem nome = todos)
 cd "$HOME" || exit 1
 F="-O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -Wno-misleading-indentation"
-[ $# -eq 0 ] && set -- ajustes apps central loja otimizador papel whatsapp gravador greeter janelas discos
+[ $# -eq 0 ] && set -- ajustes apps central loja otimizador papel whatsapp gravador greeter janelas discos jogos
 for a in "$@"; do
   P="gtk+-3.0"; SRC="nova-$a/$a.c"; OUT="nova-$a/nova-$a"
   case $a in whatsapp) P="$P webkit2gtk-4.1" ;; gravador) P="$P libpulse-simple"; OUT="nova-$a/gravador" ;; greeter) P="$P liblightdm-gobject-1" ;; janelas) P="$P x11 xcomposite cairo gio-unix-2.0" ;;

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Jogos retrô grátis
+Comment=Catálogos legais de jogos clássicos para o RetroArch
+Exec=@HOME@/.local/bin/nova-jogos
+Icon=applications-games
+Terminal=false
+StartupWMClass=Nova-jogos
+Categories=Game;

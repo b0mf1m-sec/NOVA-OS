@@ -38,6 +38,7 @@ static App apps[] = {
  { "Visualizador de imagens", "Ristretto: leve e rápido", C_IMG, 'A', "ristretto", "ristretto", "org.xfce.ristretto" },
  { "Steam", "A maior loja de jogos para PC", C_GAMES, 'F', "com.valvesoftware.Steam", NULL, "steam", TRUE },
  { "RetroArch", "Jogos clássicos: NES, Super Nintendo, Mega Drive, Game Boy, PlayStation 1 e mais. Aceita controle por cabo ou Bluetooth", C_GAMES, 'F', "org.libretro.RetroArch", NULL, "retroarch", TRUE },
+ { "Jogos retrô grátis", "Busca em catálogos legais de jogos clássicos (homebrew e freeware) para o RetroArch", C_GAMES, 'B', "nova-jogos", "nova-jogos", "applications-games", TRUE },
  { "SuperTuxKart", "Corrida de kart em 3D", C_GAMES, 'A', "supertuxkart", "supertuxkart", "supertuxkart" },
  { "Luanti", "Mundo de blocos (antigo Minetest)", C_GAMES, 'A', "luanti", "luanti", "minetest" },
  { "Paciência", "Dezenas de jogos de cartas", C_GAMES, 'A', "aisleriot", "sol", "gnome-aisleriot" },
