@@ -12,11 +12,13 @@ aplicar() {
   S="$HOME/.config/gtk-3.0/settings.ini"
   if on; then
     [ -f "$S" ] && sed -i 's/^gtk-enable-animations=.*/gtk-enable-animations=0/' "$S"
+    dconf write /net/launchpad/plank/docks/dock1/zoom-enabled false
     pkill -x nova-papel 2>/dev/null && feh --no-fehbg --bg-fill "$HOME/.local/share/nova/wallpaper.png" 2>/dev/null
     pkill -x diodon 2>/dev/null                  # histórico de copiar/colar (Win+V)
     systemctl is-active -q bluetooth || pkill -x blueman-applet 2>/dev/null
   else
     [ -f "$S" ] && sed -i 's/^gtk-enable-animations=.*/gtk-enable-animations=1/' "$S"
+    dconf write /net/launchpad/plank/docks/dock1/zoom-enabled true
     pgrep -x diodon >/dev/null || setsid diodon >/dev/null 2>&1 &
     [ "$(sed -n 's/^papel = //p' "$HOME/.config/nova/config")" = vivo ] && { pgrep -x nova-papel >/dev/null || setsid "$B/nova-papel" >/dev/null 2>&1 & }
   fi
